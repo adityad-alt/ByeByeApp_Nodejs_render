@@ -13,6 +13,8 @@ const Seafarer = require("./Seafarer");
 const SeafarerTransaction = require("./SeafarerTransaction");
 const AppUserBoat = require("./AppUserBoat");
 const TransitVehicle = require("./TransitVehicle");
+const TransitCarBooking = require("./TransitCarBooking");
+const TransitTripBooking = require("./TransitTripBooking");
 
 module.exports = {
   User,
@@ -28,5 +30,7 @@ module.exports = {
   Seafarer,
   SeafarerTransaction,
   AppUserBoat,
-  TransitVehicle
+  TransitVehicle,
+  TransitCarBooking,
+  TransitTripBooking
 };

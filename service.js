@@ -9,6 +9,7 @@ const boatParkingRoutes = require("./routes/boat_parking");
 const boatSeafarersRoutes = require("./routes/boat_seafarers");
 const userDetailsRoutes = require("./routes/user_details");
 const transitCarRentRoutes = require("./routes/transit_car_rent");
+const transitTripBookingRoutes = require("./routes/transit_trip_booking");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -38,6 +39,7 @@ app.use("/boat-parking", boatParkingRoutes);
 app.use("/seafarers", boatSeafarersRoutes);
 app.use("/user-details", userDetailsRoutes);
 app.use("/transit-car-rent", transitCarRentRoutes);
+app.use("/transit-trip-booking", transitTripBookingRoutes);
 
 const startServer = async () => {
   try {

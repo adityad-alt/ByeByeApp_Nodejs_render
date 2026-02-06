@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Uploads (license images etc.)
+uploads/
+
 # Sensitive data - DO NOT commit credentials
 credentials
 
