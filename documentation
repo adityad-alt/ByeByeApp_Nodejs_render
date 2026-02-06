@@ -1,0 +1,28 @@
+1. Auth APIs
+   /auth/login   -> generates token
+   /auth/signup
+
+2. Boat APIs (routes/boats.js)
+   /boats/all-boat-list        -> list all boats (optional query: category, sub_category)
+   /boats/boat-details/:id     -> get boat details by id
+   /boats/add-boat             -> add a new boat
+   /boats/update-boat/:id      -> update a boat by id
+   /boats/category-list        -> list distinct categories and sub_categories
+   /boats/sub-category-list    -> list subcategories by category (required query: category)
+   /boats/facilities           -> list all facilities (boat_amenities)
+
+3. Boat Booking APIs (routes/boat_bookings.js)
+   /boat-bookings/create-booking   -> create a boat booking (auth required)
+                                       body: boat_id, captain_id?, user_fullname, contact_number, email_id,
+                                             destination, date, time_slot, add_on_services?, add_on_packages?,
+                                             add_on_restaurants?, add_on_marine_equipment?, total_amount?
+   /boat-bookings/get-bookings     -> get user's bookings (auth required, optional query: id)
+   /boat-bookings/add-on-services  -> list add-on services (optional query: id)
+   /boat-bookings/add-on-services  -> create add-on service (POST; body: name, price, description?)
+   /boat-bookings/addon-packages   -> list boat addon packages (optional query: id)
+   /boat-bookings/addon-packages   -> create boat addon package (POST; body: name, price, description?,
+                                       services?, duration?, capacity?, age_range?, availability?)
+   /boat-bookings/restaurants      -> list restaurants (optional query: id, category = filter by category name)
+   /boat-bookings/restaurants      -> create restaurant (POST; body: restaurant_name, categories?, description?,
+                                       images?, items?)
+

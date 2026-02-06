@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Sensitive data - DO NOT commit credentials
+credentials
+
+# IDE/Editor
+tempCodeRunnerFile.js
+*.log
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
