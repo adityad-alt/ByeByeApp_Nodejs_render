@@ -15,6 +15,8 @@ const AppUserBoat = require("./AppUserBoat");
 const TransitVehicle = require("./TransitVehicle");
 const TransitCarBooking = require("./TransitCarBooking");
 const TransitTripBooking = require("./TransitTripBooking");
+const Jet = require("./Jet");
+const JetBooking = require("./JetBooking");
 
 module.exports = {
   User,
@@ -32,5 +34,7 @@ module.exports = {
   AppUserBoat,
   TransitVehicle,
   TransitCarBooking,
-  TransitTripBooking
+  TransitTripBooking,
+  Jet,
+  JetBooking
 };
