@@ -19,4 +19,16 @@ const auth = (req, res, next) => {
   }
 };
 
+/** Optional auth: does not fail if no/invalid token; sets req.user when token is valid */
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization || "";
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme !== "Bearer" || !token) return next();
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch (_) { /* ignore invalid token */ }
+  next();
+};
+
 module.exports = auth;
+module.exports.optionalAuth = optionalAuth;

@@ -1,5 +1,7 @@
 const express = require("express");
 const { Jet, JetBooking } = require("../models");
+const auth = require("../middleware/auth");
+const optionalAuth = auth.optionalAuth;
 
 const router = express.Router();
 
@@ -91,6 +93,8 @@ router.post("/", async (req, res) => {
       description,
       images,
       jet_type,
+      departure,
+      destination,
       status
     } = req.body;
 
@@ -107,6 +111,8 @@ router.post("/", async (req, res) => {
       description: description || null,
       images: images || null,
       jet_type: jet_type || null,
+      departure: departure || null,
+      destination: destination || null,
       status: status || "ACTIVE"
     });
 
@@ -124,8 +130,39 @@ router.post("/", async (req, res) => {
   }
 });
 
-// POST /jets/booking - Create jet booking
-router.post("/booking", async (req, res) => {
+// GET /jets/my-bookings - Get current user's jet bookings (auth required; filter by user_id)
+router.get("/my-bookings", auth, async (req, res) => {
+  try {
+    const user_id = req.user?.id;
+    if (user_id == null || user_id === undefined) {
+      return res.status(401).json({
+        message: "User not authenticated"
+      });
+    }
+
+    const bookings = await JetBooking.findAll({
+      where: { user_id },
+      order: [["created_at", "DESC"]]
+    });
+
+    const data = bookings.map((b) => (b.get ? b.get({ plain: true }) : b));
+
+    res.status(200).json({
+      message: "My jet bookings fetched successfully",
+      user_id: user_id,
+      table_name: JetBooking.tableName || "jet_bookings",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get my jet bookings",
+      error: error.message
+    });
+  }
+});
+
+// POST /jets/booking - Create jet booking (optional auth: if Bearer token present, auto-fills user_id)
+router.post("/booking", optionalAuth, async (req, res) => {
   try {
     const {
       user_id,
@@ -147,6 +184,10 @@ router.post("/booking", async (req, res) => {
       payment_method
     } = req.body;
 
+    const userId =
+      req.user?.id ??
+      (user_id != null && user_id !== "" ? Number(user_id) : null);
+
     const tripDateStr = parseDateDMY(trip_date) || trip_date;
     const tripTimeStr = parseTime(trip_time) || trip_time;
     const returnDateStr = return_date ? parseDateDMY(return_date) || return_date : null;
@@ -156,7 +197,7 @@ router.post("/booking", async (req, res) => {
 
     const booking = await JetBooking.create({
       booking_id: bookingId,
-      user_id: user_id != null ? Number(user_id) : null,
+      user_id: userId ?? null,
       jet_id: jet_id != null ? Number(jet_id) : null,
       manufacturer: manufacturer || null,
       model: model || null,
@@ -181,9 +222,12 @@ router.post("/booking", async (req, res) => {
 
     res.status(201).json({
       message: "Jet booking created successfully",
+      user_id: userId,
+      table_name: JetBooking.tableName || "jet_bookings",
       data: {
         id: data.id,
         booking_id: data.booking_id,
+        user_id: userId,
         ...data
       }
     });

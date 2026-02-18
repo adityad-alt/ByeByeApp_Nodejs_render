@@ -13,6 +13,11 @@ const TransitTripBooking = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true
     },
+    customer_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Logged-in user id (app_user.id); used to fetch my-bookings"
+    },
     brand: {
       type: DataTypes.STRING(100),
       allowNull: true

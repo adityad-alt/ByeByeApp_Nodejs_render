@@ -20,10 +20,17 @@ router.post("/signup", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, password: hashedPassword });
+    const user = await User.create({ username, email: email.toLowerCase(), password: hashedPassword });
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, gender: user.gender },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     return res.status(201).json({
       message: "Signup successful",
+      token,
       user: { id: user.id, username: user.username, email: user.email, gender: user.gender }
     });
   } catch (error) {

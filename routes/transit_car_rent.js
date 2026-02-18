@@ -2,6 +2,8 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { TransitVehicle, TransitCarBooking } = require("../models");
+const auth = require("../middleware/auth");
+const optionalAuth = auth.optionalAuth;
 
 const router = express.Router();
 
@@ -42,6 +44,7 @@ router.get("/list", async (req, res) => {
 
     res.status(200).json({
       message: "Transit vehicles list fetched successfully",
+      table_name: TransitVehicle.tableName || "transit_vehicles",
       data
     });
   } catch (error) {
@@ -81,11 +84,43 @@ router.get("/brands-models", async (req, res) => {
 
     res.status(200).json({
       message: "Brands and models fetched successfully",
+      table_name: TransitVehicle.tableName || "transit_vehicles",
       data
     });
   } catch (error) {
     res.status(500).json({
       message: "Failed to get brands and models",
+      error: error.message
+    });
+  }
+});
+
+// Get current user's car rental bookings (auth required; filter by customer_id like BoatBooking)
+router.get("/my-bookings", auth, async (req, res) => {
+  try {
+    const customer_id = req.user?.id;
+    if (customer_id == null || customer_id === undefined) {
+      return res.status(401).json({
+        message: "User not authenticated"
+      });
+    }
+
+    const bookings = await TransitCarBooking.findAll({
+      where: { customer_id },
+      order: [["created_at", "DESC"]]
+    });
+
+    const data = bookings.map((b) => (b.get ? b.get({ plain: true }) : b));
+
+    res.status(200).json({
+      message: "My car rental bookings fetched successfully",
+      customer_id: customer_id,
+      table_name: TransitCarBooking.tableName || "transit_car_bookings",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get my car rental bookings",
       error: error.message
     });
   }
@@ -114,13 +149,14 @@ function parseTime(str) {
   return `${h}:${min}:00`;
 }
 
-// Add car rental booking
-router.post("/booking", async (req, res) => {
+// Add car rental booking (optional auth: if Bearer token present, auto-fills customer_id from logged-in user)
+router.post("/booking", optionalAuth, async (req, res) => {
   try {
     const {
       brand,
       model,
       vehicle_number,
+      customer_id,
       full_name,
       contact_details,
       email_id,
@@ -138,6 +174,12 @@ router.post("/booking", async (req, res) => {
       amount,
       payment_type
     } = req.body;
+
+    // When logged in: always use token user id (so booking appears in my-bookings).
+    // When guest: use body customer_id if provided, else null.
+    const customerId =
+      req.user?.id ??
+      (customer_id != null && customer_id !== "" ? Number(customer_id) : null);
 
     const licenseFrontPath =
       saveBase64Image(driving_license_front_base64, "front") ||
@@ -157,6 +199,7 @@ router.post("/booking", async (req, res) => {
       brand: brand || null,
       model: model || null,
       vehicle_number: vehicle_number || null,
+      customer_id: customerId ?? null,
       full_name: full_name || null,
       contact_details: contact_details || null,
       email_id: email_id || null,
@@ -178,8 +221,11 @@ router.post("/booking", async (req, res) => {
 
     res.status(201).json({
       message: "Booking created successfully",
+      customer_id: customerId,
+      table_name: TransitCarBooking.tableName || "transit_car_bookings",
       data: {
         booking_id: data.booking_id,
+        customer_id: customerId,
         ...data
       }
     });

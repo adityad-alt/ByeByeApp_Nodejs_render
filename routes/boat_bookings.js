@@ -93,8 +93,8 @@ router.get("/get-bookings", auth, async (req, res) => {
     const { id } = req.query;
 
     if (id) {
-      // Fetch specific booking by ID (must belong to user)
-      const booking = await BoatBooking.findOne({
+      // Fetch specific booking transaction by ID (must belong to user)
+      const booking = await BoatBookingTransaction.findOne({
         where: { id, customer_id }
       });
 
@@ -102,26 +102,26 @@ router.get("/get-bookings", auth, async (req, res) => {
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      return res.status(200).json({ 
-        message: "Booking retrieved successfully", 
-        data: booking 
+      return res.status(200).json({
+        message: "Booking retrieved successfully",
+        data: booking
       });
     }
 
-    // Fetch all bookings for user
-    const bookings = await BoatBooking.findAll({
+    // Fetch all booking transactions for user
+    const bookings = await BoatBookingTransaction.findAll({
       where: { customer_id },
       order: [["booking_date", "DESC"]]
     });
 
-    res.status(200).json({ 
-      message: "Bookings retrieved successfully", 
-      data: bookings 
+    res.status(200).json({
+      message: "Bookings retrieved successfully",
+      data: bookings
     });
   } catch (error) {
-    res.status(500).json({ 
-      message: "Failed to retrieve bookings", 
-      error: error.message 
+    res.status(500).json({
+      message: "Failed to retrieve bookings",
+      error: error.message
     });
   }
 });

@@ -1,36 +1,29 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const TransitCarBooking = sequelize.define(
-  "TransitCarBooking",
+const EscortBooking = sequelize.define(
+  "EscortBooking",
   {
-    booking_id: {
+    id: {
       type: DataTypes.BIGINT,
       autoIncrement: true,
       primaryKey: true
     },
-    brand: {
-      type: DataTypes.STRING(100),
-      allowNull: true
-    },
-    model: {
-      type: DataTypes.STRING(120),
-      allowNull: true
-    },
-    vehicle_number: {
+    booking_id: {
       type: DataTypes.STRING(50),
-      allowNull: true
+      allowNull: true,
+      unique: true
     },
-    customer_id: {
+    user_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      comment: "Logged-in user id (app_user.id); used to fetch my-bookings"
+      comment: "Optional - links to User if logged in"
     },
     full_name: {
       type: DataTypes.STRING(150),
       allowNull: true
     },
-    contact_details: {
+    contact_number: {
       type: DataTypes.STRING(30),
       allowNull: true
     },
@@ -38,11 +31,29 @@ const TransitCarBooking = sequelize.define(
       type: DataTypes.STRING(150),
       allowNull: true
     },
-    address: {
-      type: DataTypes.TEXT,
+    escort_service_type: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: "Hire VIP or Request Protection"
+    },
+    vip_service_type: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      comment: "Bodyguards, Escort, Babysitter, etc."
+    },
+    request_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    request_time: {
+      type: DataTypes.TIME,
       allowNull: true
     },
     start_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    end_date: {
       type: DataTypes.DATEONLY,
       allowNull: true
     },
@@ -50,40 +61,33 @@ const TransitCarBooking = sequelize.define(
       type: DataTypes.TIME,
       allowNull: true
     },
-    end_date: {
-      type: DataTypes.DATEONLY,
-      allowNull: true
-    },
     end_time: {
       type: DataTypes.TIME,
       allowNull: true
     },
-    driving_license_front: {
+    location: {
       type: DataTypes.STRING(255),
       allowNull: true
     },
-    driving_license_back: {
+    primary_location: {
       type: DataTypes.STRING(255),
       allowNull: true
     },
-    dob: {
-      type: DataTypes.STRING(255),
+    special_requests: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    nationality: {
-      type: DataTypes.STRING(100),
+    additional_notes: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    amount: {
-      type: DataTypes.STRING(255),
-      allowNull: true
+    additional_locations: {
+      type: DataTypes.TINYINT,
+      allowNull: true,
+      defaultValue: 0
     },
-    payment_type: {
-      type: DataTypes.STRING(255),
-      allowNull: true
-    },
-    STATUS: {
-      type: DataTypes.STRING(255),
+    status: {
+      type: DataTypes.STRING(50),
       allowNull: true,
       defaultValue: "Pending"
     },
@@ -97,11 +101,11 @@ const TransitCarBooking = sequelize.define(
     }
   },
   {
-    tableName: "transit_car_bookings",
+    tableName: "escort_bookings",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = TransitCarBooking;
+module.exports = EscortBooking;

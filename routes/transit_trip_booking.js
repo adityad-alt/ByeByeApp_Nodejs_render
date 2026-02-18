@@ -1,7 +1,40 @@
 const express = require("express");
 const { TransitTripBooking } = require("../models");
+const auth = require("../middleware/auth");
+const optionalAuth = auth.optionalAuth;
 
 const router = express.Router();
+
+// Get current user's pickup/drop (trip) bookings (auth required; filter by customer_id)
+router.get("/my-bookings", auth, async (req, res) => {
+  try {
+    const customer_id = req.user?.id;
+    if (customer_id == null || customer_id === undefined) {
+      return res.status(401).json({
+        message: "User not authenticated"
+      });
+    }
+
+    const bookings = await TransitTripBooking.findAll({
+      where: { customer_id },
+      order: [["created_at", "DESC"]]
+    });
+
+    const data = bookings.map((b) => (b.get ? b.get({ plain: true }) : b));
+
+    res.status(200).json({
+      message: "My pickup/drop bookings fetched successfully",
+      customer_id: customer_id,
+      table_name: TransitTripBooking.tableName || "transit_trip_bookings",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get my pickup/drop bookings",
+      error: error.message
+    });
+  }
+});
 
 function parseDateDMY(str) {
   if (!str || typeof str !== "string") return null;
@@ -32,10 +65,12 @@ function parseFare(str) {
   return isNaN(n) ? null : n;
 }
 
-router.post("/booking", async (req, res) => {
+// Add trip booking (optional auth: if Bearer token present, auto-fills customer_id from logged-in user)
+router.post("/booking", optionalAuth, async (req, res) => {
   try {
     const {
       trip_id,
+      customer_id,
       brand,
       model,
       passenger_name,
@@ -49,6 +84,10 @@ router.post("/booking", async (req, res) => {
       payment_method
     } = req.body;
 
+    const customerId =
+      req.user?.id ??
+      (customer_id != null && customer_id !== "" ? Number(customer_id) : null);
+
     const tripDateStr = parseDateDMY(trip_date) || trip_date;
     const tripTimeStr = parseTime(trip_time) || trip_time;
     const fareNum = parseFare(fare);
@@ -56,6 +95,7 @@ router.post("/booking", async (req, res) => {
 
     const booking = await TransitTripBooking.create({
       trip_id: generatedTripId,
+      customer_id: customerId ?? null,
       brand: brand || null,
       model: model || null,
       passenger_name: passenger_name || null,
@@ -77,9 +117,12 @@ router.post("/booking", async (req, res) => {
 
     res.status(201).json({
       message: "Trip booking created successfully",
+      customer_id: customerId,
+      table_name: TransitTripBooking.tableName || "transit_trip_bookings",
       data: {
         id: data.id,
         trip_id: data.trip_id,
+        customer_id: customerId,
         ...data
       }
     });

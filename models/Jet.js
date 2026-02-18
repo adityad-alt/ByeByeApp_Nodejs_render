@@ -49,6 +49,16 @@ const Jet = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true
     },
+    departure: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: "Comma-separated list of departure locations"
+    },
+    destination: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: "Comma-separated list of destination locations"
+    },
     status: {
       type: DataTypes.STRING(20),
       allowNull: true,
