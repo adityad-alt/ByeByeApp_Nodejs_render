@@ -5,6 +5,11 @@ const optionalAuth = auth.optionalAuth;
 
 const router = express.Router();
 
+// GET /chalets — health check for chalet API
+router.get("/", (req, res) => {
+  res.json({ message: "Chalets API", routes: ["GET /chalets/list", "GET /chalets/chalet-details/:id", "POST /chalets/booking", "GET /chalets/my-bookings"] });
+});
+
 const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://alltestserver.space/BYEBYE";
 
 // Exclude rate_night and price_per_day from API responses
@@ -66,7 +71,7 @@ router.get("/chalet-details/:id", async (req, res) => {
 });
 
 // GET /chalets/list — list chalets for booking screen (excludes rate_night, price_per_day)
-router.get("/list", async (req, res) => {
+const listChalets = async (req, res) => {
   try {
     const list = await Chalet.findAll({
       attributes: CHALET_ATTRIBUTES,
@@ -79,7 +84,9 @@ router.get("/list", async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Failed to get chalet list", error: error.message });
   }
-});
+};
+router.get("/list", listChalets);
+router.get("/list/", listChalets);
 
 // ——— Chalet Bookings (table: chalet_bookings) ———
 
