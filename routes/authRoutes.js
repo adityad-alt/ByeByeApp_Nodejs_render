@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "e1d9ccb2b1f06ec0ed31b95f7d344d9ebb
 
 router.post("/signup", async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, avatar_url } = req.body;
 
     if (!username || !email || !password) {
       return res.status(400).json({ message: "username, email and password required" });
@@ -20,10 +20,15 @@ router.post("/signup", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email: email.toLowerCase(), password: hashedPassword });
+    const user = await User.create({
+      username,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      ...(avatar_url != null && avatar_url !== "" && { avatar_url }),
+    });
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, gender: user.gender },
+      { id: user.id, email: user.email, avatar_url: user.avatar_url ?? null },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -31,7 +36,7 @@ router.post("/signup", async (req, res) => {
     return res.status(201).json({
       message: "Signup successful",
       token,
-      user: { id: user.id, username: user.username, email: user.email, gender: user.gender }
+      user: { id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url ?? null }
     });
   } catch (error) {
     return res.status(500).json({ message: "Signup failed", error: error.message });
@@ -57,17 +62,15 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, gender: user.gender },
+      { id: user.id, email: user.email, avatar_url: user.avatar_url ?? null },
       JWT_SECRET,
-      {
-        expiresIn: "7d"
-      }
+      { expiresIn: "7d" }
     );
 
     return res.status(200).json({
       message: "Login successful",
       token,
-      user: { id: user.id, username: user.username, email: user.email, gender: user.gender }
+      user: { id: user.id, username: user.username, email: user.email, avatar_url: user.avatar_url ?? null }
     });
   } catch (error) {
     return res.status(500).json({ message: "Login failed", error: error.message });

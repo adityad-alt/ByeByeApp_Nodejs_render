@@ -22,8 +22,8 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false
     },
-    gender: {
-      type: DataTypes.STRING,
+    avatar_url: {
+      type: DataTypes.STRING(500),
       allowNull: true
     }
   },
