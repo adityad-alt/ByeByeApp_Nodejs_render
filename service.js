@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs").promises;
 const envPath = path.join(__dirname, ".env");
 require("dotenv").config({ path: envPath });
 if (!process.env.DB_HOST) {
@@ -46,8 +47,31 @@ app.get("/", (req, res) => {
   res.json({ message: "API is running" });
 });
 
+const avatarsDir = path.join(__dirname, "public", "avatars");
+const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+// GET /avatars/list – list all avatar filenames and URLs (no DB, reads folder)
+app.get("/avatars/list", async (req, res) => {
+  try {
+    const files = await fs.readdir(avatarsDir);
+    const baseUrl = `${req.protocol}://${req.get("host")}`.replace(/\/$/, "");
+    const avatars = files
+      .filter((f) => IMAGE_EXT.includes(path.extname(f).toLowerCase()))
+      .map((filename) => ({
+        filename,
+        url: `${baseUrl}/avatars/${encodeURIComponent(filename)}`,
+      }));
+    res.json({ avatars });
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return res.json({ avatars: [] });
+    }
+    res.status(500).json({ message: "Failed to list avatars", error: err.message });
+  }
+});
+
 // Static avatar images (e.g. from assets/avatar) – copy your PNGs to public/avatars/
-app.use("/avatars", express.static(path.join(__dirname, "public", "avatars")));
+app.use("/avatars", express.static(avatarsDir));
 
 app.use("/auth", authRoutes);
 app.use("/boats", boatRoutes);
