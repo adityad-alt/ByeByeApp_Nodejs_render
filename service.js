@@ -46,6 +46,9 @@ app.get("/", (req, res) => {
   res.json({ message: "API is running" });
 });
 
+// Static avatar images (e.g. from assets/avatar) – copy your PNGs to public/avatars/
+app.use("/avatars", express.static(path.join(__dirname, "public", "avatars")));
+
 app.use("/auth", authRoutes);
 app.use("/boats", boatRoutes);
 app.use("/boat-bookings", boatBookingRoutes);
