@@ -1,8 +1,153 @@
 const express = require("express");
-const { AppUserBoat, AppUserAddress } = require("../models");
+const { Op } = require("sequelize");
+const {
+  AppUserBoat,
+  AppUserAddress,
+  BoatBooking,
+  BoatBookingTransaction,
+  BoatParkingBooking,
+  JetBooking,
+  ChaletBooking,
+  TransitCarBooking,
+  TransitTripBooking,
+  CateringOrder,
+  ShopOrder,
+  DeliveryOrder,
+  EscortBooking
+} = require("../models");
 const auth = require("../middleware/auth");
 
 const router = express.Router();
+
+// Helpers for "active" (not cancelled) and "paid" (for total spent)
+const notCancelled = (col) => ({ [col]: { [Op.notIn]: ["cancelled", "Cancelled", "CANCELLED"] } });
+const paidStatus = { [Op.or]: [{ [Op.like]: "%paid%" }, { [Op.eq]: "Paid" }, { [Op.eq]: "PAID" } ] };
+
+// GET /user-details/dashboard-stats — active bookings count + total spent (from existing tables)
+router.get("/dashboard-stats", auth, async (req, res) => {
+  try {
+    const userId = req.user?.id ?? req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    let activeBookings = 0;
+    let totalSpent = 0;
+
+    // ——— Active count: bookings where user is owner and status is not cancelled ———
+    activeBookings += await BoatBooking.count({
+      where: { customer_id: userId, ...notCancelled("booking_status") }
+    }).catch(() => 0);
+
+    activeBookings += await BoatParkingBooking.count({
+      where: { user_id: userId, ...notCancelled("booking_status") }
+    }).catch(() => 0);
+
+    activeBookings += await JetBooking.count({
+      where: { user_id: userId, booking_status: { [Op.notIn]: ["Cancelled", "cancelled"] } }
+    }).catch(() => 0);
+
+    activeBookings += await ChaletBooking.count({
+      where: { customer_id: userId, ...notCancelled("booking_status") }
+    }).catch(() => 0);
+
+    activeBookings += await TransitCarBooking.count({
+      where: { customer_id: userId, STATUS: { [Op.notIn]: ["Cancelled", "cancelled"] } }
+    }).catch(() => 0);
+
+    activeBookings += await TransitTripBooking.count({
+      where: { customer_id: userId, trip_status: { [Op.notIn]: ["Cancelled", "cancelled"] } }
+    }).catch(() => 0);
+
+    activeBookings += await CateringOrder.count({
+      where: { user_id: userId, status: { [Op.notIn]: ["cancelled", "Cancelled"] } }
+    }).catch(() => 0);
+
+    activeBookings += await ShopOrder.count({
+      where: { user_id: userId, status: { [Op.notIn]: ["cancelled", "Cancelled"] } }
+    }).catch(() => 0);
+
+    activeBookings += await DeliveryOrder.count({
+      where: { user_id: userId }
+    }).catch(() => 0);
+
+    activeBookings += await EscortBooking.count({
+      where: { user_id: userId }
+    }).catch(() => 0);
+
+    // ——— Total spent: sum amounts where payment is paid (or booking not cancelled) ———
+    const toNum = (v) => (v == null ? 0 : Number(v));
+
+    const boatTxRows = await BoatBookingTransaction.findAll({
+      attributes: ["total_amount"],
+      where: { customer_id: userId, payment_status: paidStatus },
+      raw: true
+    }).catch(() => []);
+    totalSpent += boatTxRows.reduce((s, r) => s + toNum(r.total_amount), 0);
+
+    const parkingRows = await BoatParkingBooking.findAll({
+      attributes: ["total_amount"],
+      where: { user_id: userId, payment_status: paidStatus },
+      raw: true
+    }).catch(() => []);
+    totalSpent += parkingRows.reduce((s, r) => s + toNum(r.total_amount), 0);
+
+    const jetRows = await JetBooking.findAll({
+      attributes: ["fare"],
+      where: { user_id: userId, payment_status: paidStatus },
+      raw: true
+    }).catch(() => []);
+    totalSpent += jetRows.reduce((s, r) => s + toNum(r.fare), 0);
+
+    const chaletRows = await ChaletBooking.findAll({
+      attributes: ["total_amount"],
+      where: { customer_id: userId, ...notCancelled("booking_status") },
+      raw: true
+    }).catch(() => []);
+    totalSpent += chaletRows.reduce((s, r) => s + toNum(r.total_amount), 0);
+
+    const carRows = await TransitCarBooking.findAll({
+      attributes: ["amount"],
+      where: { customer_id: userId },
+      raw: true
+    }).catch(() => []);
+    totalSpent += carRows.reduce((s, r) => s + toNum(r.amount), 0);
+
+    const tripRows = await TransitTripBooking.findAll({
+      attributes: ["fare"],
+      where: { customer_id: userId, payment_status: paidStatus },
+      raw: true
+    }).catch(() => []);
+    totalSpent += tripRows.reduce((s, r) => s + toNum(r.fare), 0);
+
+    const cateringRows = await CateringOrder.findAll({
+      attributes: ["total"],
+      where: { user_id: userId, payment_status: paidStatus },
+      raw: true
+    }).catch(() => []);
+    totalSpent += cateringRows.reduce((s, r) => s + toNum(r.total), 0);
+
+    const shopRows = await ShopOrder.findAll({
+      attributes: ["total"],
+      where: { user_id: userId, status: { [Op.notIn]: ["cancelled", "Cancelled"] } },
+      raw: true
+    }).catch(() => []);
+    totalSpent += shopRows.reduce((s, r) => s + toNum(r.total), 0);
+
+    res.status(200).json({
+      message: "Dashboard stats fetched",
+      data: {
+        activeBookings: Math.max(0, activeBookings),
+        totalSpent: Math.round(totalSpent * 100) / 100
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch dashboard stats",
+      error: error.message
+    });
+  }
+});
 
 // POST /user-details/boats - Add user boat
 router.post("/boats", auth, async (req, res) => {

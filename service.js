@@ -1,4 +1,9 @@
-require("dotenv").config();
+const path = require("path");
+const envPath = path.join(__dirname, ".env");
+require("dotenv").config({ path: envPath });
+if (!process.env.DB_HOST) {
+  console.warn("Env: DB_HOST not set. Loaded from:", envPath);
+}
 const express = require("express");
 const cors = require("cors");
 const sequelize = require("./db");
@@ -19,6 +24,7 @@ const deliveryRoutes = require("./routes/delivery");
 const chaletRoutes = require("./routes/chalet");
 const catererRoutes = require("./routes/caterer");
 const shopRoutes = require("./routes/shop");
+const notificationsRoutes = require("./routes/notifications");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -57,6 +63,7 @@ app.use("/delivery", deliveryRoutes);
 app.use("/chalets", chaletRoutes);
 app.use("/caterer", catererRoutes);
 app.use("/shop", shopRoutes);
+app.use("/notifications", notificationsRoutes);
 
 const startServer = async () => {
   try {
@@ -68,7 +75,11 @@ const startServer = async () => {
       console.log(`Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Database connection failed:", error);
+    const host = process.env.DB_HOST || "(not set)";
+    const port = process.env.DB_PORT || 3306;
+    console.error("Database connection failed:", error.message);
+    console.error(`  Tried: ${host}:${port}`);
+    console.error("  Check: 1) MySQL is running  2) Host/port correct in .env  3) Firewall/remote allowlist allows your IP");
   }
 };
 

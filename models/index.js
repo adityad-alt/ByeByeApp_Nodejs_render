@@ -30,6 +30,7 @@ const CatererMenuItem = require("./CatererMenuItem");
 const AppShop = require("./AppShop");
 const ShopOrder = require("./ShopOrder");
 const ShopOrderItem = require("./ShopOrderItem");
+const AppNotification = require("./AppNotification");
 
 // Shop order associations
 ShopOrder.hasMany(ShopOrderItem, { foreignKey: "order_id", as: "ShopOrderItems" });
@@ -67,5 +68,6 @@ module.exports = {
   CatererMenuItem,
   AppShop,
   ShopOrder,
-  ShopOrderItem
+  ShopOrderItem,
+  AppNotification
 };
