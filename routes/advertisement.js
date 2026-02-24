@@ -1,6 +1,5 @@
 const express = require("express");
 const { BoatBanner } = require("../models");
-
 const router = express.Router();
 
 // Get list of advertisements (banners); optional query: status=ACTIVE|INACTIVE

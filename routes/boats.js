@@ -1,20 +1,18 @@
 const express = require("express");
-const { Boat, BoatCategory, BoatSubCategory, BoatAmenity } = require("../models");
+const {
+  Boat,
+  BoatCategory,
+  BoatSubCategory,
+  BoatAmenity,
+  BoatAddonItem,
+  BoatSpecialPackage,
+  BoatProduct,
+  BoatAddonRestaurant,
+  BoatProductCategory
+} = require("../models");
 const { Sequelize } = require("sequelize");
 
 const router = express.Router();
-
-const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://alltestserver.space/BYEBYE";
-
-function toFullImageUrl(path) {
-  if (!path || typeof path !== "string") return "";
-  const trimmed = path.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  const base = IMAGE_BASE_URL.endsWith("/") ? IMAGE_BASE_URL.slice(0, -1) : IMAGE_BASE_URL;
-  const p = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  return `${base}${p}`;
-}
 
 // Normalize boat for API response: add name, image_url, facilities for backward compatibility with Flutter
 function normalizeBoat(boat) {
@@ -52,7 +50,7 @@ function normalizeBoat(boat) {
     }
     return [trimmed];
   };
-  const galleryImages = parseImagesFromString(primaryImgRaw).map(toFullImageUrl).filter(Boolean);
+  const galleryImages = parseImagesFromString(primaryImgRaw).filter(Boolean);
   const primaryImg = galleryImages[0] ?? "";
   return {
     ...row,
@@ -76,7 +74,13 @@ router.get("/all-boat-list", async (req, res) => {
       where.sub_category_name = sub_category;
     }
 
-    const boatList = await Boat.findAll({ where });
+    const boatList = await Boat.findAll({
+      where,
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ]
+    });
     res.status(200).json({
       message: "Boat list fetched successfully",
       data: boatList.map(normalizeBoat)
@@ -119,9 +123,14 @@ router.get("/sub-category-list", async (req, res) => {
       raw: true
     });
 
+    const data = subCategories.map((r) => ({
+      ...r,
+      image_url: r.image?.trim() || null
+    }));
+
     res.status(200).json({
       message: "Subcategory list fetched successfully",
-      data: subCategories
+      data
     });
   } catch (error) {
     res.status(500).json({
@@ -257,6 +266,195 @@ router.put("/update-boat/:id", async (req, res) => {
     res.status(200).json({ message: "Boat updated successfully", data: { rowsUpdated: rows } });
   } catch (error) {
     res.status(500).json({ message: "Failed to update boat", error: error.message });
+  }
+});
+
+// Fetch boat addon items from boat_addon_items table (optional query: status=ACTIVE|INACTIVE)
+router.get("/addon-items", async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = {};
+    if (status && ["ACTIVE", "INACTIVE"].includes(String(status).toUpperCase())) {
+      where.STATUS = String(status).toUpperCase();
+    }
+
+    const rows = await BoatAddonItem.findAll({
+      where: Object.keys(where).length ? where : undefined,
+      order: [["addon_package_name", "ASC"]],
+      raw: true
+    });
+
+    const data = rows.map((r) => ({
+      ...r,
+      addon_image: r.addon_image || null
+    }));
+
+    res.status(200).json({
+      message: "Boat addon items fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat addon items",
+      error: error.message
+    });
+  }
+});
+
+// Fetch boat special packages from boat_special_packages table (optional query: status=ACTIVE|INACTIVE)
+router.get("/special-packages", async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = {};
+    if (status && ["ACTIVE", "INACTIVE"].includes(String(status).toUpperCase())) {
+      where.STATUS = String(status).toUpperCase();
+    }
+
+    const rows = await BoatSpecialPackage.findAll({
+      where: Object.keys(where).length ? where : undefined,
+      order: [["package_name", "ASC"]],
+      raw: true
+    });
+
+    const data = rows.map((r) => ({
+      ...r,
+      package_images: r.package_images || null
+    }));
+
+    res.status(200).json({
+      message: "Boat special packages fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat special packages",
+      error: error.message
+    });
+  }
+});
+
+// Fetch boat products from boat_products table (optional query: status=Active|Inactive|Draft, category, sub_category)
+router.get("/products", async (req, res) => {
+  try {
+    const { status, category, sub_category } = req.query;
+    const where = {};
+    if (status && ["Active", "Inactive", "Draft"].includes(String(status))) {
+      where.status = String(status);
+    }
+    if (category && String(category).trim()) {
+      where.category = String(category).trim();
+    }
+    if (sub_category != null && String(sub_category).trim() !== "") {
+      where.sub_category = String(sub_category).trim();
+    }
+
+    const rows = await BoatProduct.findAll({
+      where: Object.keys(where).length ? where : undefined,
+      order: [["product_name", "ASC"]],
+      raw: true
+    });
+
+    res.status(200).json({
+      message: "Boat products fetched successfully",
+      data: rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat products",
+      error: error.message
+    });
+  }
+});
+
+// Fetch boat addon restaurants from boat_addon_restaurants table
+router.get("/addon-restaurants", async (req, res) => {
+  try {
+    const rows = await BoatAddonRestaurant.findAll({
+      order: [["restaurant_name", "ASC"]],
+      raw: true
+    });
+
+    const parseJson = (val) => {
+      if (val == null) return val;
+      if (typeof val === "string") {
+        try {
+          return JSON.parse(val);
+        } catch (_) {
+          return val;
+        }
+      }
+      return val;
+    };
+
+    const data = rows.map((r) => {
+      const categories = parseJson(r.categories);
+      const images = parseJson(r.images);
+      const items = parseJson(r.items);
+      return {
+        ...r,
+        categories: Array.isArray(categories) ? categories : categories,
+        images: Array.isArray(images) ? images : images,
+        items: Array.isArray(items) ? items : items
+      };
+    });
+
+    res.status(200).json({
+      message: "Boat addon restaurants fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat addon restaurants",
+      error: error.message
+    });
+  }
+});
+
+// Boat product categories: 1) list all, 2) get one by category_name (query: category_name)
+// Returns category_name, category_icon_url (full URL), description, status
+router.get("/boat-product-categories", async (req, res) => {
+  try {
+    const { category_name: categoryName } = req.query;
+
+    if (categoryName != null && String(categoryName).trim() !== "") {
+      const name = String(categoryName).trim();
+      const item = await BoatProductCategory.findOne({
+        where: { category_name: name },
+        raw: true
+      });
+      if (!item) {
+        return res.status(404).json({
+          message: "Boat product category not found",
+          data: null
+        });
+      }
+      const data = {
+        ...item,
+        category_icon_url: item.category_icon?.trim() || null
+      };
+      return res.status(200).json({
+        message: "Boat product category fetched successfully",
+        data
+      });
+    }
+
+    const rows = await BoatProductCategory.findAll({
+      order: [["category_name", "ASC"]],
+      raw: true
+    });
+    const list = rows.map((row) => ({
+      ...row,
+      category_icon_url: row.category_icon?.trim() || null
+    }));
+    res.status(200).json({
+      message: "Boat product categories fetched successfully",
+      data: list
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat product categories",
+      error: error.message
+    });
   }
 });
 

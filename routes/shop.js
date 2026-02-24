@@ -5,20 +5,6 @@ const sequelize = require("../db");
 
 const router = express.Router();
 
-// Optional: base URL for image URLs (if stored as paths)
-const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "";
-
-function toFullImageUrl(path) {
-  if (!path || typeof path !== "string") return path || null;
-  const trimmed = path.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  if (!IMAGE_BASE_URL) return trimmed;
-  const base = IMAGE_BASE_URL.endsWith("/") ? IMAGE_BASE_URL.slice(0, -1) : IMAGE_BASE_URL;
-  const p = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  return `${base}${p}`;
-}
-
 function formatItem(row) {
   if (!row) return null;
   const r = row.get ? row.get({ plain: true }) : { ...row };
@@ -27,7 +13,7 @@ function formatItem(row) {
     name: r.name,
     description: r.description || null,
     price: parseFloat(r.price),
-    imageUrl: toFullImageUrl(r.image_url) || r.image_url,
+    imageUrl: r.image_url?.trim() ?? null,
     category_name: r.category_name
   };
 }
@@ -131,7 +117,10 @@ router.get("/items", async (req, res) => {
     const where = categoryNameFilter ? { category_name: categoryNameFilter } : {};
     const items = await AppShop.findAll({
       where,
-      order: [["id", "ASC"]]
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ]
     });
 
     res.status(200).json({

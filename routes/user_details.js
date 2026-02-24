@@ -3,7 +3,6 @@ const { Op } = require("sequelize");
 const {
   AppUserBoat,
   AppUserAddress,
-  BoatBooking,
   BoatBookingTransaction,
   BoatParkingBooking,
   JetBooking,
@@ -35,7 +34,7 @@ router.get("/dashboard-stats", auth, async (req, res) => {
     let totalSpent = 0;
 
     // ——— Active count: bookings where user is owner and status is not cancelled ———
-    activeBookings += await BoatBooking.count({
+    activeBookings += await BoatBookingTransaction.count({
       where: { customer_id: userId, ...notCancelled("booking_status") }
     }).catch(() => 0);
 

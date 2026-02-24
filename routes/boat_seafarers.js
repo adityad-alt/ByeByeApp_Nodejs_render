@@ -1,6 +1,5 @@
 const express = require("express");
 const { Seafarer, SeafarerTransaction } = require("../models");
-
 const router = express.Router();
 
 function generateCode(prefix) {
@@ -9,25 +8,9 @@ function generateCode(prefix) {
   return `${prefix}-${ts}-${r}`;
 }
 
-const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://alltestserver.space/BYEBYE";
-
-function toFullImageUrl(path) {
-  if (!path || typeof path !== "string") return "";
-  const trimmed = path.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  const base = IMAGE_BASE_URL.endsWith("/") ? IMAGE_BASE_URL.slice(0, -1) : IMAGE_BASE_URL;
-  const p = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  return `${base}${p}`;
-}
-
 function normalizeSeafarer(seafarer) {
   const row = seafarer.get ? seafarer.get({ plain: true }) : seafarer;
-  return {
-    ...row,
-    profile_photo_url: toFullImageUrl(row.profile_photo_url),
-    documents_image: toFullImageUrl(row.documents_image)
-  };
+  return { ...row };
 }
 
 // Get seafarers list (all or by status, optional id for single)

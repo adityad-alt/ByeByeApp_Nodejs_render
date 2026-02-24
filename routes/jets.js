@@ -2,7 +2,6 @@ const express = require("express");
 const { Jet, JetBooking } = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
-
 const router = express.Router();
 
 function parseDateDMY(str) {
@@ -61,8 +60,8 @@ router.get("/", async (req, res) => {
     const jets = await Jet.findAll({
       where: Object.keys(where).length ? where : undefined,
       order: [
-        ["manufacturer", "ASC"],
-        ["model", "ASC"]
+        ["created_at", "DESC"],
+        ["id", "DESC"]
       ],
       raw: true
     });

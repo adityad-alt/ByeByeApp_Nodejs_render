@@ -35,8 +35,8 @@ router.get("/list", async (req, res) => {
   try {
     const vehicles = await TransitVehicle.findAll({
       order: [
-        ["brand", "ASC"],
-        ["model", "ASC"]
+        ["created_at", "DESC"],
+        ["id", "DESC"]
       ]
     });
 
@@ -61,8 +61,8 @@ router.get("/brands-models", async (req, res) => {
     const vehicles = await TransitVehicle.findAll({
       attributes: ["brand", "model"],
       order: [
-        ["brand", "ASC"],
-        ["model", "ASC"]
+        ["created_at", "DESC"],
+        ["id", "DESC"]
       ],
       raw: true
     });

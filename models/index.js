@@ -3,7 +3,6 @@ const Boat = require("./Boat");
 const BoatCategory = require("./BoatCategory");
 const BoatSubCategory = require("./BoatSubCategory");
 const BoatAmenity = require("./BoatAmenity");
-const BoatBooking = require("./BoatBooking");
 const BoatBookingTransaction = require("./BoatBookingTransaction");
 
 const BoatBanner = require("./BoatBanner");
@@ -31,6 +30,12 @@ const AppShop = require("./AppShop");
 const ShopOrder = require("./ShopOrder");
 const ShopOrderItem = require("./ShopOrderItem");
 const AppNotification = require("./AppNotification");
+const BoatAddonItem = require("./BoatAddonItem");
+const BoatSpecialPackage = require("./BoatSpecialPackage");
+const BoatProduct = require("./BoatProduct");
+const BoatAddonRestaurant = require("./BoatAddonRestaurant");
+const BoatProductCategory = require("./BoatProductCategory");
+const BoatBookingAddon = require("./BoatBookingAddon");
 
 // Shop order associations
 ShopOrder.hasMany(ShopOrderItem, { foreignKey: "order_id", as: "ShopOrderItems" });
@@ -43,7 +48,6 @@ module.exports = {
   BoatCategory,
   BoatSubCategory,
   BoatAmenity,
-  BoatBooking,
   BoatBookingTransaction,
   BoatBanner,
   BoatCoupon,
@@ -69,5 +73,11 @@ module.exports = {
   AppShop,
   ShopOrder,
   ShopOrderItem,
-  AppNotification
+  AppNotification,
+  BoatAddonItem,
+  BoatSpecialPackage,
+  BoatProduct,
+  BoatAddonRestaurant,
+  BoatProductCategory,
+  BoatBookingAddon
 };

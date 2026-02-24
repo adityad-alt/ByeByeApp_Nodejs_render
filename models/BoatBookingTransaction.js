@@ -9,10 +9,6 @@ const BoatBookingTransaction = sequelize.define(
       autoIncrement: true,
       primaryKey: true
     },
-    booking_id: {
-      type: DataTypes.BIGINT,
-      allowNull: true
-    },
     order_id: {
       type: DataTypes.STRING(50),
       allowNull: true

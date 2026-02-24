@@ -1,7 +1,6 @@
 const express = require("express");
-const { BoatBooking, BoatBookingTransaction } = require("../models");
+const { BoatBookingTransaction, BoatBookingAddon } = require("../models");
 const auth = require("../middleware/auth");
-
 const router = express.Router();
 
 router.post("/create-booking", auth, async (req, res) => {
@@ -86,6 +85,132 @@ router.post("/create-booking", auth, async (req, res) => {
   }
 });
 
+// Add addons for a booking (id = app_boat_booking_transactions.id)
+// POST /boat-bookings/addons
+// Body: { booking_id, items: [{ source_type, source_id, quantity?, unit_price, total_price?, name? }, ...] }
+router.post("/addons", auth, async (req, res) => {
+  try {
+    const { booking_id, items } = req.body;
+    const customerId = req.user?.id;
+
+    if (!booking_id) {
+      return res.status(400).json({
+        message: "booking_id is required"
+      });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: "items array is required and must not be empty"
+      });
+    }
+
+    const booking = await BoatBookingTransaction.findByPk(booking_id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (customerId && booking.customer_id != null && booking.customer_id !== customerId) {
+      return res.status(403).json({ message: "You are not allowed to modify this booking" });
+    }
+
+    const allowedTypes = new Set([
+      "boat_addon_item",
+      "boat_addon_restaurant",
+      "boat_special_package",
+      "boat_product"
+    ]);
+
+    const rows = [];
+    for (const item of items) {
+      const { source_type, source_id, quantity, unit_price, total_price, name } = item || {};
+      if (!source_type || !allowedTypes.has(String(source_type))) {
+        return res.status(400).json({
+          message: `Invalid source_type: ${source_type}`
+        });
+      }
+      if (source_id == null) {
+        return res.status(400).json({
+          message: "source_id is required for each item"
+        });
+      }
+      if (unit_price == null) {
+        return res.status(400).json({
+          message: "unit_price is required for each item"
+        });
+      }
+      const qty = quantity != null ? Number(quantity) : 1;
+      const unit = Number(unit_price);
+      const total = total_price != null ? Number(total_price) : unit * qty;
+      const addonName = name != null && String(name).trim() !== "" ? String(name).trim() : null;
+
+      rows.push({
+        booking_id,
+        source_type: String(source_type),
+        source_id,
+        quantity: qty,
+        unit_price: unit,
+        total_price: total,
+        name: addonName
+      });
+    }
+
+    const created = await BoatBookingAddon.bulkCreate(rows, { returning: true });
+
+    res.status(201).json({
+      message: "Booking addons created successfully",
+      data: created
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to create booking addons",
+      error: error.message
+    });
+  }
+});
+
+// Get addons for a booking (id = app_boat_booking_transactions.id)
+// GET /boat-bookings/addons?booking_id=ID
+router.get("/addons", auth, async (req, res) => {
+  try {
+    const { booking_id } = req.query;
+    const customerId = req.user?.id;
+
+    if (!booking_id) {
+      return res.status(400).json({
+        message: "booking_id query param is required"
+      });
+    }
+
+    const booking = await BoatBookingTransaction.findByPk(booking_id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (customerId && booking.customer_id != null && booking.customer_id !== customerId) {
+      return res.status(403).json({ message: "You are not allowed to view these addons" });
+    }
+
+    const addons = await BoatBookingAddon.findAll({
+      where: { booking_id },
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ],
+      raw: true
+    });
+
+    res.status(200).json({
+      message: "Booking addons fetched successfully",
+      data: addons
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch booking addons",
+      error: error.message
+    });
+  }
+});
+
 // Get bookings (all or by ID) for the authenticated user
 router.get("/get-bookings", auth, async (req, res) => {
   try {
@@ -108,10 +233,13 @@ router.get("/get-bookings", auth, async (req, res) => {
       });
     }
 
-    // Fetch all booking transactions for user
+    // Fetch all booking transactions for user (newest first)
     const bookings = await BoatBookingTransaction.findAll({
       where: { customer_id },
-      order: [["booking_date", "DESC"]]
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ]
     });
 
     res.status(200).json({

@@ -1,6 +1,5 @@
 const express = require("express");
 const { BoatParking } = require("../models");
-
 const router = express.Router();
 
 // Get boat parking place list (optional query: status=ACTIVE|INACTIVE|DRAFT)

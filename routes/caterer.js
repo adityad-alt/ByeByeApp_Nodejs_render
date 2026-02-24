@@ -1,7 +1,6 @@
 const express = require("express");
 const { CateringOrder, CatererMenuItem, Caterer } = require("../models");
 const auth = require("../middleware/auth");
-
 const router = express.Router();
 
 // ——— Caterer list & create (for Chalet / Catering Services UI) ———
@@ -44,7 +43,10 @@ router.get("/list", async (req, res) => {
     let data = [];
     try {
       const list = await Caterer.findAll({
-        order: [["id", "ASC"]],
+        order: [
+          ["created_at", "DESC"],
+          ["id", "DESC"]
+        ],
         raw: true
       });
       if (list && list.length > 0) {
@@ -52,7 +54,7 @@ router.get("/list", async (req, res) => {
           id: r.id,
           name: r.name || `Caterer ${r.id}`,
           address: r.address || "",
-          image_url: r.image_url || null,
+          image_url: r.image_url ?? null,
           rating: r.rating || "4.8"
         }));
       }

@@ -2,7 +2,6 @@ const express = require("express");
 const { Op } = require("sequelize");
 const { AppNotification } = require("../models");
 const { optionalAuth } = require("../middleware/auth");
-
 const router = express.Router();
 
 // POST /notifications — create notification (for admin panel; optionally protect with admin auth later)

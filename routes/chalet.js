@@ -2,7 +2,6 @@ const express = require("express");
 const { Chalet, ChaletBooking } = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
-
 const router = express.Router();
 
 // GET /chalets — health check for chalet API
@@ -10,26 +9,14 @@ router.get("/", (req, res) => {
   res.json({ message: "Chalets API", routes: ["GET /chalets/list", "GET /chalets/chalet-details/:id", "POST /chalets/booking", "GET /chalets/my-bookings"] });
 });
 
-const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "https://alltestserver.space/BYEBYE";
-
 // Exclude rate_night and price_per_day from API responses
 const CHALET_ATTRIBUTES = { exclude: ["rate_night", "price_per_day"] };
-
-function toFullImageUrl(path) {
-  if (!path || typeof path !== "string") return "";
-  const trimmed = path.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  const base = IMAGE_BASE_URL.endsWith("/") ? IMAGE_BASE_URL.slice(0, -1) : IMAGE_BASE_URL;
-  const p = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  return `${base}${p}`;
-}
 
 function normalizeChaletDetail(row) {
   if (!row) return null;
   const r = row.get ? row.get({ plain: true }) : { ...row };
   const primaryImg = r.primary_image_url ?? r.image_url ?? "";
-  r.image_url = primaryImg ? toFullImageUrl(primaryImg) : null;
+  r.image_url = primaryImg || null;
   r.primary_image_url = r.image_url;
   if (r.amenities_json != null && typeof r.amenities_json === "string") {
     try {
@@ -48,7 +35,7 @@ function normalizeChaletListItem(row) {
   if (!row) return null;
   const r = row.get ? row.get({ plain: true }) : { ...row };
   const primaryImg = r.primary_image_url ?? r.image_url ?? "";
-  r.image_url = primaryImg ? toFullImageUrl(primaryImg) : null;
+  r.image_url = primaryImg || null;
   return r;
 }
 
@@ -75,7 +62,10 @@ const listChalets = async (req, res) => {
   try {
     const list = await Chalet.findAll({
       attributes: CHALET_ATTRIBUTES,
-      order: [["id", "DESC"]]
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ]
     });
     res.status(200).json({
       message: "Chalet list fetched successfully",
