@@ -52,8 +52,12 @@ const Boat = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true
     },
-    address: {
-      type: DataTypes.STRING(500),
+    lat: {
+      type: DataTypes.DECIMAL(10, 8),
+      allowNull: true
+    },
+    long: {
+      type: DataTypes.DECIMAL(11, 8),
       allowNull: true
     },
     length_meters: {

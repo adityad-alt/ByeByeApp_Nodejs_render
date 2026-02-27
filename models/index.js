@@ -36,6 +36,7 @@ const BoatProduct = require("./BoatProduct");
 const BoatAddonRestaurant = require("./BoatAddonRestaurant");
 const BoatProductCategory = require("./BoatProductCategory");
 const BoatBookingAddon = require("./BoatBookingAddon");
+const BoatDestination = require("./BoatDestination");
 
 // Shop order associations
 ShopOrder.hasMany(ShopOrderItem, { foreignKey: "order_id", as: "ShopOrderItems" });
@@ -79,5 +80,6 @@ module.exports = {
   BoatProduct,
   BoatAddonRestaurant,
   BoatProductCategory,
-  BoatBookingAddon
+  BoatBookingAddon,
+  BoatDestination
 };
