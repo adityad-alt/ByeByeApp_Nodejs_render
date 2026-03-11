@@ -155,10 +155,12 @@ router.post("/boats", auth, async (req, res) => {
       boat_name,
       height,
       width,
+      length,
       boat_type,
       civil_id_image,
       license_image,
-      additional_images
+      additional_images,
+      additional_videos
     } = req.body;
 
     const userId = req.user?.id;
@@ -173,6 +175,7 @@ router.post("/boats", auth, async (req, res) => {
       boat_name: boat_name || null,
       height: height || null,
       width: width || null,
+      length: length || null,
       boat_type: boat_type || null,
       civil_id_image: civil_id_image || null,
       license_image: license_image || null,
@@ -180,6 +183,12 @@ router.post("/boats", auth, async (req, res) => {
         ? JSON.stringify(additional_images)
         : typeof additional_images === "string"
           ? additional_images
+          : null
+      ,
+      additional_videos: Array.isArray(additional_videos)
+        ? JSON.stringify(additional_videos)
+        : typeof additional_videos === "string"
+          ? additional_videos
           : null
     });
 

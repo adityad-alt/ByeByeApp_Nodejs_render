@@ -18,7 +18,7 @@ const AppShop = sequelize.define(
     updated_at: { type: DataTypes.DATE, allowNull: true }
   },
   {
-    tableName: "app_shop",
+    tableName: "allora_ecommerce_products",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

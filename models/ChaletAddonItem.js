@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const BoatAddonItem = sequelize.define(
-  "BoatAddonItem",
+const ChaletAddonItem = sequelize.define(
+  "ChaletAddonItem",
   {
     id: {
       type: DataTypes.BIGINT,
@@ -21,7 +21,7 @@ const BoatAddonItem = sequelize.define(
     currency: {
       type: DataTypes.STRING(10),
       allowNull: false,
-      defaultValue: "AED"
+      defaultValue: "KWD"
     },
     days: {
       type: DataTypes.INTEGER,
@@ -50,11 +50,12 @@ const BoatAddonItem = sequelize.define(
     }
   },
   {
-    tableName: "bluewave_addon",
+    tableName: "allora_chalet_addon",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = BoatAddonItem;
+module.exports = ChaletAddonItem;
+

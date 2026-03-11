@@ -189,7 +189,7 @@ router.get("/sub-category-list", async (req, res) => {
   }
 });
 
-// Get list of facilities (from boat_amenities table; optional query: status = active|inactive)
+// Get list of facilities (from amenities table; optional query: status = active|inactive)
 router.get("/facilities", async (req, res) => {
   try {
     const { status } = req.query;

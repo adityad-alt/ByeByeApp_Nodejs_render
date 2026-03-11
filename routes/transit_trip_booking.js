@@ -25,7 +25,7 @@ router.get("/my-bookings", auth, async (req, res) => {
     res.status(200).json({
       message: "My pickup/drop bookings fetched successfully",
       customer_id: customer_id,
-      table_name: TransitTripBooking.tableName || "transit_trip_bookings",
+      table_name: TransitTripBooking.tableName || "globalgo_trip_bookings",
       data
     });
   } catch (error) {
@@ -118,7 +118,7 @@ router.post("/booking", optionalAuth, async (req, res) => {
     res.status(201).json({
       message: "Trip booking created successfully",
       customer_id: customerId,
-      table_name: TransitTripBooking.tableName || "transit_trip_bookings",
+      table_name: TransitTripBooking.tableName || "globalgo_trip_bookings",
       data: {
         id: data.id,
         trip_id: data.trip_id,

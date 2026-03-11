@@ -1,27 +1,31 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const BoatSubCategory = sequelize.define(
-  "BoatSubCategory",
+const ChaletAddonRestaurant = sequelize.define(
+  "ChaletAddonRestaurant",
   {
     id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true
     },
-    category_name: {
-      type: DataTypes.STRING(255),
+    categories: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    sub_category_name: {
-      type: DataTypes.STRING(255),
+    restaurant_name: {
+      type: DataTypes.STRING(150),
+      allowNull: false
+    },
+    description: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    image: {
-      type: DataTypes.STRING(255),
+    images: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    status: {
+    items: {
       type: DataTypes.TEXT,
       allowNull: true
     },
@@ -35,11 +39,12 @@ const BoatSubCategory = sequelize.define(
     }
   },
   {
-    tableName: "bluewave_boat_sub_category",
+    tableName: "allora_chalet_addon_restaurants",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = BoatSubCategory;
+module.exports = ChaletAddonRestaurant;
+

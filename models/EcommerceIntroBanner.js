@@ -1,28 +1,24 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const BoatSubCategory = sequelize.define(
-  "BoatSubCategory",
+const EcommerceIntroBanner = sequelize.define(
+  "EcommerceIntroBanner",
   {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       autoIncrement: true,
       primaryKey: true
     },
-    category_name: {
+    banner_title: {
       type: DataTypes.STRING(255),
       allowNull: true
     },
-    sub_category_name: {
-      type: DataTypes.STRING(255),
-      allowNull: true
-    },
-    image: {
-      type: DataTypes.STRING(255),
+    banner_image: {
+      type: DataTypes.STRING(500),
       allowNull: true
     },
     status: {
-      type: DataTypes.TEXT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     created_at: {
@@ -35,11 +31,12 @@ const BoatSubCategory = sequelize.define(
     }
   },
   {
-    tableName: "bluewave_boat_sub_category",
+    tableName: "allora_ecommerce_intro_banner",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = BoatSubCategory;
+module.exports = EcommerceIntroBanner;
+

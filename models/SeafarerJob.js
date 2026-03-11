@@ -1,49 +1,46 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const BoatCoupon = sequelize.define(
-  "BoatCoupon",
+const SeafarerJob = sequelize.define(
+  "SeafarerJob",
   {
     id: {
       type: DataTypes.BIGINT,
       autoIncrement: true,
       primaryKey: true
     },
-    coupon_code: {
+    full_name: {
+      type: DataTypes.STRING(150),
+      allowNull: true
+    },
+    license_number: {
       type: DataTypes.STRING(100),
       allowNull: true
     },
-    discount_type: {
+    email: {
+      type: DataTypes.STRING(150),
+      allowNull: true
+    },
+    phone: {
+      type: DataTypes.STRING(30),
+      allowNull: true
+    },
+    specialty: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    experience_years: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    certifications: {
       type: DataTypes.TEXT,
       allowNull: true
     },
-    discount_value: {
-      type: DataTypes.STRING(255),
-      allowNull: true
-    },
-    minimum_order: {
-      type: DataTypes.STRING(255),
-      allowNull: true
-    },
-    valid_from: {
-      type: DataTypes.DATEONLY,
-      allowNull: true
-    },
-    valid_to: {
-      type: DataTypes.DATEONLY,
-      allowNull: true
-    },
-    usage_limit: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    times_used: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
     STATUS: {
-      type: DataTypes.STRING(50),
-      allowNull: true
+      type: DataTypes.ENUM("pending", "active", "inactive"),
+      allowNull: true,
+      defaultValue: "pending"
     },
     created_at: {
       type: DataTypes.DATE,
@@ -55,11 +52,12 @@ const BoatCoupon = sequelize.define(
     }
   },
   {
-    tableName: "boat_coupons",
+    tableName: "bluewave_seafare_jobs",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = BoatCoupon;
+module.exports = SeafarerJob;
+

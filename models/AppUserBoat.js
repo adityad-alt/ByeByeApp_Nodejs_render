@@ -25,6 +25,10 @@ const AppUserBoat = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true
     },
+    length: {
+      type: DataTypes.STRING(50),
+      allowNull: true
+    },
     boat_type: {
       type: DataTypes.STRING(100),
       allowNull: true
@@ -41,6 +45,10 @@ const AppUserBoat = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true
     },
+    additional_videos: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: true
@@ -51,7 +59,7 @@ const AppUserBoat = sequelize.define(
     }
   },
   {
-    tableName: "app_user_boat",
+    tableName: "bluewave_user_boat_details",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

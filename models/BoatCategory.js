@@ -31,7 +31,7 @@ const BoatCategory = sequelize.define(
     }
   },
   {
-    tableName: "boat_category",
+    tableName: "bluewave_boat_category",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

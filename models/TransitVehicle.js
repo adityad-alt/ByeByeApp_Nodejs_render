@@ -55,6 +55,14 @@ const TransitVehicle = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true
     },
+    lat: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true
+    },
+    long: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: true
@@ -65,7 +73,7 @@ const TransitVehicle = sequelize.define(
     }
   },
   {
-    tableName: "transit_vehicles",
+    tableName: "globalgo_vehicles",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

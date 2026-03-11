@@ -1,29 +1,30 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const BoatSubCategory = sequelize.define(
-  "BoatSubCategory",
+const BluewavePolicy = sequelize.define(
+  "BluewavePolicy",
   {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       autoIncrement: true,
       primaryKey: true
     },
-    category_name: {
-      type: DataTypes.STRING(255),
-      allowNull: true
+    policy_type: {
+      type: DataTypes.ENUM("refund", "terms", "privacy"),
+      allowNull: false
     },
-    sub_category_name: {
+    title: {
       type: DataTypes.STRING(255),
-      allowNull: true
+      allowNull: false
     },
-    image: {
-      type: DataTypes.STRING(255),
-      allowNull: true
+    description: {
+      type: DataTypes.TEXT("long"),
+      allowNull: false
     },
     status: {
-      type: DataTypes.TEXT,
-      allowNull: true
+      type: DataTypes.TINYINT,
+      allowNull: false,
+      defaultValue: 1
     },
     created_at: {
       type: DataTypes.DATE,
@@ -35,11 +36,12 @@ const BoatSubCategory = sequelize.define(
     }
   },
   {
-    tableName: "bluewave_boat_sub_category",
+    tableName: "bluewave_policies",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = BoatSubCategory;
+module.exports = BluewavePolicy;
+

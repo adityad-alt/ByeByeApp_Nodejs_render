@@ -1,5 +1,11 @@
 const express = require("express");
-const { Chalet, ChaletBooking } = require("../models");
+const {
+  Chalet,
+  ChaletBooking,
+  ChaletAddonItem,
+  ChaletSpecialPackage,
+  ChaletAddonRestaurant
+} = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
 const router = express.Router();
@@ -39,6 +45,31 @@ function normalizeChaletListItem(row) {
   return r;
 }
 
+// Haversine helpers: distance between two lat/long points in kilometers
+function toRad(deg) {
+  return (deg * Math.PI) / 180;
+}
+
+function distanceInKm(lat1, lon1, lat2, lon2) {
+  const n1 = Number(lat1);
+  const n2 = Number(lon1);
+  const n3 = Number(lat2);
+  const n4 = Number(lon2);
+
+  if ([n1, n2, n3, n4].some((v) => Number.isNaN(v))) {
+    return null;
+  }
+
+  const R = 6371; // km
+  const dLat = toRad(n3 - n1);
+  const dLon = toRad(n4 - n2);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(n1)) * Math.cos(toRad(n3)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // GET /chalets/chalet-details/:id — get single chalet (excludes rate_night, price_per_day)
 router.get("/chalet-details/:id", async (req, res) => {
   try {
@@ -58,8 +89,12 @@ router.get("/chalet-details/:id", async (req, res) => {
 });
 
 // GET /chalets/list — list chalets for booking screen (excludes rate_night, price_per_day)
+// Optional query:
+// - lat, long, radius_km for distance-based filtering (default radius 100km)
 const listChalets = async (req, res) => {
   try {
+    const { lat: userLat, long: userLong, radius_km: radiusKm } = req.query;
+
     const list = await Chalet.findAll({
       attributes: CHALET_ATTRIBUTES,
       order: [
@@ -67,9 +102,38 @@ const listChalets = async (req, res) => {
         ["id", "DESC"]
       ]
     });
+
+    const normalized = list.map(normalizeChaletListItem).filter(Boolean);
+
+    let data = normalized;
+
+    const hasUserLocation =
+      userLat != null && userLat !== "" && userLong != null && userLong !== "";
+    const parsedRadius =
+      radiusKm != null && radiusKm !== "" ? Number(radiusKm) : 100;
+    const radius =
+      Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 100;
+
+    if (hasUserLocation) {
+      const userLatNum = Number(userLat);
+      const userLongNum = Number(userLong);
+
+      if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
+        data = normalized
+          .map((item) => {
+            const cLat = item.lat;
+            const cLong = item.long;
+            const dist = distanceInKm(userLatNum, userLongNum, cLat, cLong);
+            if (dist == null) return null;
+            return { ...item, distance_km: dist };
+          })
+          .filter((c) => c && c.distance_km <= radius)
+          .sort((a, b) => a.distance_km - b.distance_km);
+      }
+    }
     res.status(200).json({
       message: "Chalet list fetched successfully",
-      data: list.map(normalizeChaletListItem).filter(Boolean)
+      data
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to get chalet list", error: error.message });
@@ -247,4 +311,113 @@ router.post("/", async (req, res) => {
 
   All fields are optional. Use "amenities" as array or "amenities_json" as JSON string.
 */
+
+// Fetch chalet addon items from allora_chalet_addon table (optional query: status=ACTIVE|INACTIVE)
+router.get("/addon-items", async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = {};
+    if (status && ["ACTIVE", "INACTIVE"].includes(String(status).toUpperCase())) {
+      where.STATUS = String(status).toUpperCase();
+    }
+
+    const rows = await ChaletAddonItem.findAll({
+      where: Object.keys(where).length ? where : undefined,
+      order: [["addon_package_name", "ASC"]],
+      raw: true
+    });
+
+    const data = rows.map((r) => ({
+      ...r,
+      addon_image: r.addon_image || null
+    }));
+
+    res.status(200).json({
+      message: "Chalet addon items fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet addon items",
+      error: error.message
+    });
+  }
+});
+
+// Fetch chalet special packages from allora_special_packages table (optional query: status=ACTIVE|INACTIVE)
+router.get("/special-packages", async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = {};
+    if (status && ["ACTIVE", "INACTIVE"].includes(String(status).toUpperCase())) {
+      where.STATUS = String(status).toUpperCase();
+    }
+
+    const rows = await ChaletSpecialPackage.findAll({
+      where: Object.keys(where).length ? where : undefined,
+      order: [["package_name", "ASC"]],
+      raw: true
+    });
+
+    const data = rows.map((r) => ({
+      ...r,
+      package_images: r.package_images || null
+    }));
+
+    res.status(200).json({
+      message: "Chalet special packages fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet special packages",
+      error: error.message
+    });
+  }
+});
+
+// Fetch chalet addon restaurants from allora_chalet_addon_restaurants table
+router.get("/addon-restaurants", async (req, res) => {
+  try {
+    const rows = await ChaletAddonRestaurant.findAll({
+      order: [["restaurant_name", "ASC"]],
+      raw: true
+    });
+
+    const parseJson = (val) => {
+      if (val == null) return val;
+      if (typeof val === "string") {
+        try {
+          return JSON.parse(val);
+        } catch (_) {
+          return val;
+        }
+      }
+      return val;
+    };
+
+    const data = rows.map((r) => {
+      const categories = parseJson(r.categories);
+      const images = parseJson(r.images);
+      const items = parseJson(r.items);
+      return {
+        ...r,
+        categories: Array.isArray(categories) ? categories : categories,
+        images: Array.isArray(images) ? images : images,
+        items: Array.isArray(items) ? items : items
+      };
+    });
+
+    res.status(200).json({
+      message: "Chalet addon restaurants fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet addon restaurants",
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

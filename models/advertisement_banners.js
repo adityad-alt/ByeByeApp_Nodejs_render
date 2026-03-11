@@ -35,7 +35,7 @@ const BoatBanner = sequelize.define(
     }
   },
   {
-    tableName: "boat_banners",
+    tableName: "advertisement_banners",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
@@ -43,3 +43,4 @@ const BoatBanner = sequelize.define(
 );
 
 module.exports = BoatBanner;
+

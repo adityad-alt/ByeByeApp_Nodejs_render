@@ -57,7 +57,7 @@ const BoatSpecialPackage = sequelize.define(
     }
   },
   {
-    tableName: "boat_special_packages",
+    tableName: "bluewave_special_packages",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

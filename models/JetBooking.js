@@ -104,7 +104,7 @@ const JetBooking = sequelize.define(
     }
   },
   {
-    tableName: "jet_bookings",
+    tableName: "globalgo_jet_booking",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

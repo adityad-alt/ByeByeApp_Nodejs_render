@@ -30,9 +30,37 @@ function saveBase64Image(base64Data, suffix) {
   }
 }
 
-// Get list of all transit vehicles
+// Haversine helpers: distance between two lat/long points in kilometers
+function toRad(deg) {
+  return (deg * Math.PI) / 180;
+}
+
+function distanceInKm(lat1, lon1, lat2, lon2) {
+  const n1 = Number(lat1);
+  const n2 = Number(lon1);
+  const n3 = Number(lat2);
+  const n4 = Number(lon2);
+
+  if ([n1, n2, n3, n4].some((v) => Number.isNaN(v))) {
+    return null;
+  }
+
+  const R = 6371; // km
+  const dLat = toRad(n3 - n1);
+  const dLon = toRad(n4 - n2);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(n1)) * Math.cos(toRad(n3)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Get list of all transit vehicles (optional:
+// - lat, long, radius_km for distance-based filtering (default radius 100km))
 router.get("/list", async (req, res) => {
   try {
+    const { lat: userLat, long: userLong, radius_km: radiusKm } = req.query;
+
     const vehicles = await TransitVehicle.findAll({
       order: [
         ["created_at", "DESC"],
@@ -40,11 +68,38 @@ router.get("/list", async (req, res) => {
       ]
     });
 
-    const data = vehicles.map((v) => (v.get ? v.get({ plain: true }) : v));
+    const rows = vehicles.map((v) => (v.get ? v.get({ plain: true }) : v));
+
+    let data = rows;
+
+    const hasUserLocation =
+      userLat != null && userLat !== "" && userLong != null && userLong !== "";
+    const parsedRadius =
+      radiusKm != null && radiusKm !== "" ? Number(radiusKm) : 100;
+    const radius =
+      Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 100;
+
+    if (hasUserLocation) {
+      const userLatNum = Number(userLat);
+      const userLongNum = Number(userLong);
+
+      if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
+        data = rows
+          .map((item) => {
+            const vLat = item.lat;
+            const vLong = item.long;
+            const dist = distanceInKm(userLatNum, userLongNum, vLat, vLong);
+            if (dist == null) return null;
+            return { ...item, distance_km: dist };
+          })
+          .filter((v) => v && v.distance_km <= radius)
+          .sort((a, b) => a.distance_km - b.distance_km);
+      }
+    }
 
     res.status(200).json({
       message: "Transit vehicles list fetched successfully",
-      table_name: TransitVehicle.tableName || "transit_vehicles",
+      table_name: TransitVehicle.tableName || "globalgo_vehicles",
       data
     });
   } catch (error) {
@@ -84,7 +139,7 @@ router.get("/brands-models", async (req, res) => {
 
     res.status(200).json({
       message: "Brands and models fetched successfully",
-      table_name: TransitVehicle.tableName || "transit_vehicles",
+      table_name: TransitVehicle.tableName || "globalgo_vehicles",
       data
     });
   } catch (error) {
@@ -115,7 +170,7 @@ router.get("/my-bookings", auth, async (req, res) => {
     res.status(200).json({
       message: "My car rental bookings fetched successfully",
       customer_id: customer_id,
-      table_name: TransitCarBooking.tableName || "transit_car_bookings",
+      table_name: TransitCarBooking.tableName || "globalgo_car_bookings",
       data
     });
   } catch (error) {
@@ -222,7 +277,7 @@ router.post("/booking", optionalAuth, async (req, res) => {
     res.status(201).json({
       message: "Booking created successfully",
       customer_id: customerId,
-      table_name: TransitCarBooking.tableName || "transit_car_bookings",
+      table_name: TransitCarBooking.tableName || "globalgo_car_bookings",
       data: {
         booking_id: data.booking_id,
         customer_id: customerId,

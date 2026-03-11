@@ -56,7 +56,7 @@ const AppUserAddress = sequelize.define(
     }
   },
   {
-    tableName: "app_user_addresses",
+    tableName: "byebye_user_addresses",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

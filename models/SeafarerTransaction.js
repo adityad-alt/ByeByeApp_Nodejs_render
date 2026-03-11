@@ -66,7 +66,7 @@ const SeafarerTransaction = sequelize.define(
     }
   },
   {
-    tableName: "seafarer_transactions",
+    tableName: "bluewave_seafarer_transactions",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

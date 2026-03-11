@@ -35,7 +35,7 @@ const Caterer = sequelize.define(
     }
   },
   {
-    tableName: "caterers",
+    tableName: "allora_caterers",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

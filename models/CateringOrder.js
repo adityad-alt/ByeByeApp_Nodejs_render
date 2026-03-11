@@ -75,7 +75,7 @@ const CateringOrder = sequelize.define(
     }
   },
   {
-    tableName: "catering_orders",
+    tableName: "allora_catering_orders",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

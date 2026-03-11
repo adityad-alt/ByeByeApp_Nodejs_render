@@ -12,6 +12,8 @@ const Chalet = sequelize.define(
     name: { type: DataTypes.STRING(255), allowNull: true },
     description: { type: DataTypes.TEXT, allowNull: true },
     address: { type: DataTypes.TEXT, allowNull: true },
+    lat: { type: DataTypes.DECIMAL(10, 7), allowNull: true },
+    long: { type: DataTypes.DECIMAL(10, 7), allowNull: true },
     price_per_night: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
     bedrooms: { type: DataTypes.INTEGER, allowNull: true },
     bathrooms: { type: DataTypes.INTEGER, allowNull: true },
@@ -37,7 +39,7 @@ const Chalet = sequelize.define(
     updated_at: { type: DataTypes.DATE, allowNull: true }
   },
   {
-    tableName: "chalet",
+    tableName: "allora_chalet",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

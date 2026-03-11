@@ -45,6 +45,14 @@ const Jet = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true
     },
+    lat: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true
+    },
+    long: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true
+    },
     jet_type: {
       type: DataTypes.STRING(50),
       allowNull: true
@@ -74,7 +82,7 @@ const Jet = sequelize.define(
     }
   },
   {
-    tableName: "jets",
+    tableName: "globalgo_jets",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

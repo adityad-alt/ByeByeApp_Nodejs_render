@@ -47,7 +47,7 @@ const CatererMenuItem = sequelize.define(
     }
   },
   {
-    tableName: "caterer_menu_items",
+    tableName: "allora_caterer_menu_items",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

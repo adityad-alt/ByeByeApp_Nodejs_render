@@ -1,6 +1,6 @@
 const express = require("express");
 const { Op } = require("sequelize");
-const { AppShop, ShopOrder, ShopOrderItem } = require("../models");
+const { AppShop, ShopOrder, ShopOrderItem, EcommerceIntroBanner } = require("../models");
 const sequelize = require("../db");
 
 const router = express.Router();
@@ -20,14 +20,14 @@ function formatItem(row) {
 
 /**
  * GET /shop/categories
- * Returns unique categories from app_shop (derived from items).
+ * Returns unique categories from allora_ecommerce_products (derived from items).
  * Response: { message, data: [ { id, name } ] }
  * id is 1-based index for use with GET /shop/items?category_id=1
  */
 router.get("/categories", async (req, res) => {
   try {
     const list = await sequelize.query(
-      `SELECT DISTINCT category_name FROM app_shop WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name ASC`,
+      `SELECT DISTINCT category_name FROM allora_ecommerce_products WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name ASC`,
       { type: sequelize.QueryTypes.SELECT }
     );
     const rows = Array.isArray(list) ? list : [];
@@ -42,6 +42,80 @@ router.get("/categories", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch categories",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /shop/intro-banners
+ * Returns active ecommerce intro banners from allora_ecommerce_intro_banner.
+ * Response: { message, data: [ { id, banner_title, banner_image, status } ] }
+ */
+router.get("/intro-banners", async (req, res) => {
+  try {
+    const rows = await EcommerceIntroBanner.findAll({
+      where: { status: 1 },
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ],
+      raw: true
+    });
+
+    const data = rows.map((r) => ({
+      id: r.id,
+      banner_title: r.banner_title || "",
+      banner_image: r.banner_image || null,
+      status: r.status ?? 1
+    }));
+
+    res.status(200).json({
+      message: "Shop intro banners fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch shop intro banners",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /shop/intro-banners
+ * Body: { banner_title, banner_image, status? }
+ * Creates a new ecommerce intro banner in allora_ecommerce_intro_banner.
+ */
+router.post("/intro-banners", async (req, res) => {
+  try {
+    const { banner_title, banner_image, status } = req.body;
+
+    if (!banner_title || typeof banner_title !== "string" || !banner_title.trim()) {
+      return res.status(400).json({ message: "banner_title is required" });
+    }
+    if (!banner_image || typeof banner_image !== "string" || !banner_image.trim()) {
+      return res.status(400).json({ message: "banner_image is required" });
+    }
+
+    const banner = await EcommerceIntroBanner.create({
+      banner_title: banner_title.trim(),
+      banner_image: banner_image.trim(),
+      status: typeof status === "number" ? status : 1
+    });
+
+    return res.status(201).json({
+      message: "Shop intro banner created successfully",
+      data: {
+        id: banner.id,
+        banner_title: banner.banner_title,
+        banner_image: banner.banner_image,
+        status: banner.status
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to create shop intro banner",
       error: error.message
     });
   }
@@ -103,7 +177,7 @@ router.get("/items", async (req, res) => {
       const id = parseInt(categoryId, 10);
       if (!Number.isNaN(id) && id >= 1) {
         const catList = await sequelize.query(
-          `SELECT DISTINCT category_name FROM app_shop WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name ASC`,
+          `SELECT DISTINCT category_name FROM allora_ecommerce_products WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name ASC`,
           { type: sequelize.QueryTypes.SELECT }
         );
         const catRows = Array.isArray(catList) ? catList : [];
@@ -205,9 +279,8 @@ function formatOrder(row) {
 }
 
 /**
- * POST /shop/orders
  * Body: { items: [ { item_id, quantity } ] }
- * Creates a shop order and order line items. Looks up price from app_shop.
+ * Creates a shop order and order line items. Looks up price from allora_ecommerce_products.
  */
 router.post("/orders", async (req, res) => {
   try {

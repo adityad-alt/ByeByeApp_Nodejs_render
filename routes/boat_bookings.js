@@ -1,5 +1,10 @@
 const express = require("express");
-const { BoatBookingTransaction, BoatBookingAddon, BoatDestination } = require("../models");
+const {
+  BoatBookingTransaction,
+  BoatBookingAddon,
+  BoatDestination,
+  BluewavePolicy
+} = require("../models");
 const auth = require("../middleware/auth");
 const router = express.Router();
 
@@ -15,9 +20,11 @@ router.post("/create-booking", auth, async (req, res) => {
       customer_name,
       customer_contact,
       customer_email,
+      start_trip_date,
+      start_trip_time,
+      end_trip_date,
+      end_trip_time,
       booking_date,
-      start_time,
-      end_time,
       captain_name,
       captain_image_url,
       destination_name,
@@ -40,9 +47,10 @@ router.post("/create-booking", auth, async (req, res) => {
     const customerId = customer_id ?? req.user?.id;
 
     // Validate required fields
-    if (!boat_id || !booking_date || !start_time || !end_time) {
+    if (!boat_id || !start_trip_date || !start_trip_time || !end_trip_date || !end_trip_time) {
       return res.status(400).json({
-        message: "boat_id, booking_date, start_time and end_time are required"
+        message:
+          "boat_id, start_trip_date, start_trip_time, end_trip_date and end_trip_time are required"
       });
     }
 
@@ -58,9 +66,11 @@ router.post("/create-booking", auth, async (req, res) => {
       customer_name: customer_name || null,
       customer_contact: customer_contact || null,
       customer_email: customer_email || null,
-      booking_date,
-      start_time,
-      end_time,
+      booking_date: booking_date || start_trip_date || null,
+      start_trip_date: start_trip_date || null,
+      start_trip_time: start_trip_time || null,
+      end_trip_date: end_trip_date || null,
+      end_trip_time: end_trip_time || null,
       captain_name: captain_name || null,
       captain_image_url: captain_image_url || null,
       destination_name: destination_name || null,
@@ -211,12 +221,32 @@ router.get("/addons", auth, async (req, res) => {
   }
 });
 
-// Create a destination (latitude/longitude)
+// Create a destination
 // POST /boat-bookings/destinations
-// Body: { latitude, longitude }
+// Body: {
+//   boat_id?,
+//   destination_name?,
+//   destination_code?,
+//   country?,
+//   city?,
+//   port_name?,
+//   port_code?,
+//   latitude,
+//   longitude
+// }
 router.post("/destinations", auth, async (req, res) => {
   try {
-    const { latitude, longitude } = req.body;
+    const {
+      boat_id,
+      destination_name,
+      destination_code,
+      country,
+      city,
+      port_name,
+      port_code,
+      latitude,
+      longitude
+    } = req.body;
 
     if (latitude == null || longitude == null) {
       return res.status(400).json({
@@ -225,6 +255,13 @@ router.post("/destinations", auth, async (req, res) => {
     }
 
     const destination = await BoatDestination.create({
+      boat_id,
+      destination_name,
+      destination_code,
+      country,
+      city,
+      port_name,
+      port_code,
       latitude,
       longitude
     });
@@ -241,17 +278,14 @@ router.post("/destinations", auth, async (req, res) => {
   }
 });
 
-// Get destinations (all, by ID, or within 100km of lat/long)
+// Get destinations (all, by ID, or by boat_id)
 // GET /boat-bookings/destinations
-//   ?id=ID  -> single destination
-//   ?latitude=LAT&longitude=LNG  or  body: { latitude, longitude }  -> list within 100km
-//   (no id, no lat/long)  -> all destinations
+//   ?id=ID       -> single destination
+//   ?boat_id=ID  -> all destinations for a specific boat
+//   (no id/boat_id) -> all destinations
 router.get("/destinations", auth, async (req, res) => {
   try {
-    const { id } = req.query;
-    // Accept lat/long from query or body
-    const latitude = req.query.latitude ?? req.body?.latitude;
-    const longitude = req.query.longitude ?? req.body?.longitude;
+    const { id, boat_id } = req.query;
 
     if (id) {
       const destination = await BoatDestination.findByPk(id);
@@ -264,35 +298,14 @@ router.get("/destinations", auth, async (req, res) => {
         message: "Destination retrieved successfully",
         data: destination
       });
-    }
-
-    // If lat/long provided, return only destinations within 100km (Haversine)
-    if (latitude != null && longitude != null) {
-      const lat = Number(latitude);
-      const lng = Number(longitude);
-      if (Number.isNaN(lat) || Number.isNaN(lng)) {
-        return res.status(400).json({
-          message: "latitude and longitude must be valid numbers"
-        });
-      }
-
-      const sequelize = BoatDestination.sequelize;
-      const tableName = BoatDestination.tableName;
-      const destinations = await sequelize.query(
-        `SELECT id, latitude, longitude,
-          ( 6371 * 2 * ASIN(SQRT(
-            POWER(SIN(RADIANS(latitude - :lat)), 2) +
-            COS(RADIANS(:lat)) * COS(RADIANS(latitude)) *
-            POWER(SIN(RADIANS(longitude - :lng)), 2)
-          )) ) AS distance_km
-         FROM \`${tableName}\`
-         HAVING distance_km <= 100
-         ORDER BY distance_km ASC`,
-        { replacements: { lat, lng }, type: sequelize.QueryTypes.SELECT }
-      );
+    } else if (boat_id) {
+      const destinations = await BoatDestination.findAll({
+        where: { boat_id },
+        order: [["id", "ASC"]]
+      });
 
       return res.status(200).json({
-        message: "Destinations within 100km retrieved successfully",
+        message: "Destinations for boat retrieved successfully",
         data: destinations
       });
     }
@@ -351,6 +364,37 @@ router.get("/get-bookings", auth, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to retrieve bookings",
+      error: error.message
+    });
+  }
+});
+
+// Get active boat booking policy (bluewave_policies)
+// GET /boat-bookings/policy?policy_type=terms|refund|privacy
+router.get("/policy", async (req, res) => {
+  try {
+    const allowedTypes = new Set(["refund", "terms", "privacy"]);
+    const typeFromQuery = String(req.query.policy_type || "").toLowerCase();
+    const policyType = allowedTypes.has(typeFromQuery) ? typeFromQuery : "terms";
+
+    const policy = await BluewavePolicy.findOne({
+      where: { policy_type: policyType, status: 1 },
+      order: [["id", "DESC"]]
+    });
+
+    if (!policy) {
+      return res.status(404).json({
+        message: "Policy not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Policy fetched successfully",
+      data: policy
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch policy",
       error: error.message
     });
   }

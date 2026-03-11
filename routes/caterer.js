@@ -1,5 +1,10 @@
 const express = require("express");
-const { CateringOrder, CatererMenuItem, Caterer } = require("../models");
+const {
+  CateringOrder,
+  CatererMenuItem,
+  Caterer,
+  ChaletIntroBanner
+} = require("../models");
 const auth = require("../middleware/auth");
 const router = express.Router();
 
@@ -258,6 +263,37 @@ router.get("/menu-items", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch menu items",
+      error: error.message
+    });
+  }
+});
+
+// GET /caterer/intro-banners - Intro banners for catering service (from allora_chalet_intro_banner)
+router.get("/intro-banners", async (req, res) => {
+  try {
+    const rows = await ChaletIntroBanner.findAll({
+      where: { status: 1 },
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ],
+      raw: true
+    });
+
+    const data = rows.map((r) => ({
+      id: r.id,
+      banner_title: r.banner_title || "",
+      banner_image: r.banner_image || null,
+      status: r.status ?? 1
+    }));
+
+    res.status(200).json({
+      message: "Catering intro banners fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch catering intro banners",
       error: error.message
     });
   }

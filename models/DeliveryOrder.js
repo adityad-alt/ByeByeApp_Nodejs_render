@@ -117,7 +117,7 @@ const DeliveryOrder = sequelize.define(
     }
   },
   {
-    tableName: "delivery_orders",
+    tableName: "globalgo_shipments",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

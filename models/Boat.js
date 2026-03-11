@@ -87,7 +87,7 @@ const Boat = sequelize.define(
     }
   },
   {
-    tableName: "boats_create_new",
+    tableName: "bluewave_create_boat",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

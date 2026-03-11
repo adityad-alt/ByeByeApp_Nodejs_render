@@ -5,12 +5,12 @@ const BoatSubCategory = require("./BoatSubCategory");
 const BoatAmenity = require("./BoatAmenity");
 const BoatBookingTransaction = require("./BoatBookingTransaction");
 
-const BoatBanner = require("./BoatBanner");
-const BoatCoupon = require("./BoatCoupon");
+const BoatBanner = require("./advertisement_banners");
 const BoatParking = require("./BoatParking");
 const BoatParkingBooking = require("./BoatParkingBooking");
 const Seafarer = require("./Seafarer");
 const SeafarerTransaction = require("./SeafarerTransaction");
+const SeafarerJob = require("./SeafarerJob");
 const AppUserBoat = require("./AppUserBoat");
 const AppUserAddress = require("./AppUserAddress");
 const TransitVehicle = require("./TransitVehicle");
@@ -30,13 +30,19 @@ const AppShop = require("./AppShop");
 const ShopOrder = require("./ShopOrder");
 const ShopOrderItem = require("./ShopOrderItem");
 const AppNotification = require("./AppNotification");
+const ChaletIntroBanner = require("./ChaletIntroBanner");
+const EcommerceIntroBanner = require("./EcommerceIntroBanner");
 const BoatAddonItem = require("./BoatAddonItem");
 const BoatSpecialPackage = require("./BoatSpecialPackage");
 const BoatProduct = require("./BoatProduct");
 const BoatAddonRestaurant = require("./BoatAddonRestaurant");
+const ChaletAddonItem = require("./ChaletAddonItem");
+const ChaletSpecialPackage = require("./ChaletSpecialPackage");
+const ChaletAddonRestaurant = require("./ChaletAddonRestaurant");
 const BoatProductCategory = require("./BoatProductCategory");
 const BoatBookingAddon = require("./BoatBookingAddon");
 const BoatDestination = require("./BoatDestination");
+const BluewavePolicy = require("./BluewavePolicy");
 
 // Shop order associations
 ShopOrder.hasMany(ShopOrderItem, { foreignKey: "order_id", as: "ShopOrderItems" });
@@ -51,11 +57,11 @@ module.exports = {
   BoatAmenity,
   BoatBookingTransaction,
   BoatBanner,
-  BoatCoupon,
   BoatParking,
   BoatParkingBooking,
   Seafarer,
   SeafarerTransaction,
+  SeafarerJob,
   AppUserBoat,
   AppUserAddress,
   TransitVehicle,
@@ -81,5 +87,11 @@ module.exports = {
   BoatAddonRestaurant,
   BoatProductCategory,
   BoatBookingAddon,
-  BoatDestination
+  BoatDestination,
+  ChaletIntroBanner,
+  EcommerceIntroBanner,
+  ChaletAddonItem,
+  ChaletSpecialPackage,
+  ChaletAddonRestaurant,
+  BluewavePolicy
 };

@@ -11,7 +11,7 @@ const BoatParking = sequelize.define(
     },
     parking_name: {
       type: DataTypes.STRING(255),
-      allowNull: true
+      allowNull: false
     },
     marina_name: {
       type: DataTypes.STRING(255),
@@ -19,22 +19,32 @@ const BoatParking = sequelize.define(
     },
     STATUS: {
       type: DataTypes.ENUM("ACTIVE", "INACTIVE", "DRAFT"),
-      allowNull: true
+      allowNull: false,
+      defaultValue: "ACTIVE"
     },
     short_description: {
       type: DataTypes.TEXT,
       allowNull: true
     },
     parking_type: {
+      // Keep as STRING to avoid enum mismatch if DB enum expands.
       type: DataTypes.STRING(50),
-      allowNull: true
+      allowNull: false
     },
     location_name: {
       type: DataTypes.STRING(255),
-      allowNull: true
+      allowNull: false
     },
     full_address: {
       type: DataTypes.TEXT,
+      allowNull: false
+    },
+    lat: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true
+    },
+    long: {
+      type: DataTypes.DECIMAL(10, 7),
       allowNull: true
     },
     access_notes: {
@@ -47,11 +57,11 @@ const BoatParking = sequelize.define(
     },
     total_spots: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     max_boat_length: {
       type: DataTypes.STRING(50),
-      allowNull: true
+      allowNull: false
     },
     max_boat_width: {
       type: DataTypes.STRING(50),
@@ -66,16 +76,17 @@ const BoatParking = sequelize.define(
       allowNull: true
     },
     pricing_model: {
-      type: DataTypes.STRING(50),
-      allowNull: true
+      // DB is enum; enforcing known values here avoids bad data.
+      type: DataTypes.ENUM("PER_HOUR", "PER_DAY", "PER_WEEK", "PER_MONTH"),
+      allowNull: false
     },
     base_price: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: false
     },
     currency: {
-      type: DataTypes.STRING(10),
-      allowNull: true
+      type: DataTypes.ENUM("USD", "SAR", "AED", "EUR"),
+      allowNull: false
     },
     minimum_booking: {
       type: DataTypes.STRING(100),
@@ -107,7 +118,8 @@ const BoatParking = sequelize.define(
     },
     available_247: {
       type: DataTypes.BOOLEAN,
-      allowNull: true
+      allowNull: true,
+      defaultValue: false
     },
     advance_booking: {
       type: DataTypes.STRING(100),
@@ -127,19 +139,23 @@ const BoatParking = sequelize.define(
     },
     rule_no_overnight: {
       type: DataTypes.BOOLEAN,
-      allowNull: true
+      allowNull: true,
+      defaultValue: false
     },
     rule_engine_off: {
       type: DataTypes.BOOLEAN,
-      allowNull: true
+      allowNull: true,
+      defaultValue: false
     },
     rule_no_loud_music: {
       type: DataTypes.BOOLEAN,
-      allowNull: true
+      allowNull: true,
+      defaultValue: false
     },
     rule_waste_disposal: {
       type: DataTypes.BOOLEAN,
-      allowNull: true
+      allowNull: true,
+      defaultValue: false
     },
     policy_notes: {
       type: DataTypes.TEXT,
@@ -167,7 +183,7 @@ const BoatParking = sequelize.define(
     }
   },
   {
-    tableName: "boat_parkings",
+    tableName: "bluewave_parking_list",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

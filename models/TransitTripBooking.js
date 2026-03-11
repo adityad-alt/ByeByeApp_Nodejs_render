@@ -88,7 +88,7 @@ const TransitTripBooking = sequelize.define(
     }
   },
   {
-    tableName: "transit_trip_bookings",
+    tableName: "globalgo_trip_bookings",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

@@ -1,17 +1,21 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const BoatAddonItem = sequelize.define(
-  "BoatAddonItem",
+const ChaletSpecialPackage = sequelize.define(
+  "ChaletSpecialPackage",
   {
     id: {
       type: DataTypes.BIGINT,
       autoIncrement: true,
       primaryKey: true
     },
-    addon_package_name: {
+    package_name: {
       type: DataTypes.STRING(255),
       allowNull: false
+    },
+    duration: {
+      type: DataTypes.STRING(100),
+      allowNull: true
     },
     price: {
       type: DataTypes.DECIMAL(10, 2),
@@ -19,19 +23,22 @@ const BoatAddonItem = sequelize.define(
       defaultValue: 0
     },
     currency: {
-      type: DataTypes.STRING(10),
-      allowNull: false,
-      defaultValue: "AED"
+      type: DataTypes.TEXT,
+      allowNull: false
     },
-    days: {
+    max_participants: {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    hours: {
-      type: DataTypes.INTEGER,
+    description: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    addon_image: {
+    inclusions: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    package_images: {
       type: DataTypes.STRING(500),
       allowNull: true
     },
@@ -50,11 +57,12 @@ const BoatAddonItem = sequelize.define(
     }
   },
   {
-    tableName: "bluewave_addon",
+    tableName: "allora_special_packages",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = BoatAddonItem;
+module.exports = ChaletSpecialPackage;
+

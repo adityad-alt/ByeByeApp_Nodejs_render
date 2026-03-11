@@ -36,7 +36,7 @@ const BoatProductCategory = sequelize.define(
     }
   },
   {
-    tableName: "boat_product_categories",
+    tableName: "bluewave_marine_equipment_category",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

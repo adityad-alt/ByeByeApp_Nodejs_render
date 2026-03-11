@@ -36,7 +36,8 @@ const BoatAmenity = sequelize.define(
     }
   },
   {
-    tableName: "boat_amenities",
+    // NOTE: mapped to `amenities` table (was `boat_amenities`)
+    tableName: "amenities",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
