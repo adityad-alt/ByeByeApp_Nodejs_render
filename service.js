@@ -8,6 +8,7 @@ if (!process.env.DB_HOST) {
 const express = require("express");
 const cors = require("cors");
 const sequelize = require("./db");
+const auth = require("./middleware/auth");
 const authRoutes = require("./routes/authRoutes");
 const boatRoutes = require("./routes/boats");
 const amenitiesRoutes = require("./routes/amenities");
@@ -23,6 +24,7 @@ const transitCarRentRoutes = require("./routes/transit_car_rent");
 const transitTripBookingRoutes = require("./routes/transit_trip_booking");
 const jetsRoutes = require("./routes/jets");
 const escortServiceRoutes = require("./routes/escort_service");
+const escortServiceBookingsRoutes = require("./routes/escort_service_bookings");
 const deliveryRoutes = require("./routes/delivery");
 const chaletRoutes = require("./routes/chalet");
 const catererRoutes = require("./routes/caterer");
@@ -89,7 +91,10 @@ app.use("/user-details", userDetailsRoutes);
 app.use("/transit-car-rent", transitCarRentRoutes);
 app.use("/transit-trip-booking", transitTripBookingRoutes);
 app.use("/jets", jetsRoutes);
-app.use("/escort-service", escortServiceRoutes);
+// All escort-service details routes require authentication
+app.use("/escort-service", auth, escortServiceRoutes);
+// Escort service bookings (uses own auth/optionalAuth per route)
+app.use("/escort-service-bookings", escortServiceBookingsRoutes);
 app.use("/delivery", deliveryRoutes);
 app.use("/chalets", chaletRoutes);
 app.use("/caterer", catererRoutes);

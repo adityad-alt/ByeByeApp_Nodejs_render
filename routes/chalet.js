@@ -182,12 +182,56 @@ function parseDateDMY(str) {
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
+function normalizeDateInput(val) {
+  if (val == null) return null;
+  if (typeof val === "string") {
+    const s = val.trim();
+    if (!s) return null;
+    // Already ISO-like YYYY-MM-DD → accept as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return s;
+    }
+    // Try D/M/Y or D-M-Y formats
+    const dmy = parseDateDMY(s);
+    if (dmy) return dmy;
+    return s;
+  }
+  return null;
+}
+
 function parseAmount(val) {
   if (val == null) return null;
   if (typeof val === "number" && !isNaN(val)) return val;
   const s = String(val).trim().replace(/[^\d.]/g, "");
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
+}
+
+function normalizeTimeHHmm(val) {
+  if (val == null) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  const pad2 = (n) => String(n).padStart(2, "0");
+  return `${pad2(hh)}:${pad2(mm)}`;
+}
+
+function buildNotesWithTimes(notes, checkInTime, checkOutTime) {
+  const inT = normalizeTimeHHmm(checkInTime);
+  const outT = normalizeTimeHHmm(checkOutTime);
+  const prefixParts = [];
+  if (inT) prefixParts.push(`__check_in_time=${inT}`);
+  if (outT) prefixParts.push(`__check_out_time=${outT}`);
+  const prefix = prefixParts.length ? `${prefixParts.join(";")};` : "";
+  const userNotes = notes != null && String(notes).trim() !== "" ? String(notes).trim() : "";
+  if (!prefix) return userNotes || null;
+  if (!userNotes) return prefix;
+  return `${prefix}\n${userNotes}`;
 }
 
 // POST /chalets/booking — create a chalet booking (optional auth: fills customer_id if logged in)
@@ -197,7 +241,9 @@ router.post("/booking", optionalAuth, async (req, res) => {
       chalet_id,
       customer_id: bodyCustomerId,
       check_in_date,
+      check_in_time,
       check_out_date,
+      check_out_time,
       guest_name,
       contact_number,
       email_id,
@@ -215,9 +261,12 @@ router.post("/booking", optionalAuth, async (req, res) => {
       return res.status(400).json({ message: "chalet_id is required" });
     }
 
-    const checkInStr = parseDateDMY(check_in_date) || (typeof check_in_date === "string" ? check_in_date : null);
-    const checkOutStr = parseDateDMY(check_out_date) || (typeof check_out_date === "string" ? check_out_date : null);
+    const checkInStr = normalizeDateInput(check_in_date);
+    const checkOutStr = normalizeDateInput(check_out_date);
     const amountNum = parseAmount(total_amount);
+    const inTime = normalizeTimeHHmm(check_in_time);
+    const outTime = normalizeTimeHHmm(check_out_time);
+    const finalNotes = buildNotesWithTimes(notes, inTime, outTime);
 
     const booking = await ChaletBooking.create({
       chalet_id: chaletId,
@@ -229,7 +278,7 @@ router.post("/booking", optionalAuth, async (req, res) => {
       email_id: email_id || null,
       total_amount: amountNum,
       booking_status: booking_status || "booked",
-      notes: notes || null
+      notes: finalNotes
     });
 
     const data = booking.get ? booking.get({ plain: true }) : booking;

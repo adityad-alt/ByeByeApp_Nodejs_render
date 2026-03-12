@@ -67,6 +67,11 @@ const Jet = sequelize.define(
       allowNull: true,
       comment: "Comma-separated list of destination locations"
     },
+    available_stock: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    },
     status: {
       type: DataTypes.STRING(20),
       allowNull: true,

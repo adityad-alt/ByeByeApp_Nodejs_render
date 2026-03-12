@@ -1,175 +1,176 @@
 const express = require("express");
-const { EscortBooking } = require("../models");
-const auth = require("../middleware/auth");
-const optionalAuth = auth.optionalAuth;
+const { QueryTypes } = require("sequelize");
+const sequelize = require("../db");
 
 const router = express.Router();
 
-function parseDateDMY(str) {
-  if (!str || typeof str !== "string") return null;
-  const parts = str.trim().split(/[/-]/);
-  if (parts.length !== 3) return null;
-  const d = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10);
-  const y = parseInt(parts[2], 10);
-  if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-  const pad = (n) => (n < 10 ? "0" + n : String(n));
-  return `${y}-${pad(m)}-${pad(d)}`;
-}
+/**
+ * GET /escort-service/categories
+ *
+ * Query params:
+ * - service_type_name (string, required)
+ *
+ * Returns distinct categories for the given service type.
+ */
+router.get("/categories", async (req, res) => {
+  const { service_type_name } = req.query;
 
-function parseTime(str) {
-  if (!str || typeof str !== "string") return null;
-  const m = str.trim().match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return null;
-  const h = m[1].padStart(2, "0");
-  const min = m[2];
-  return `${h}:${min}:00`;
-}
-
-// GET / - List escort bookings
-// Query: ?id= - single by id
-//        ?user_id= - filter by user (for "my bookings")
-// GET /my-bookings - auth required, returns current user's bookings
-router.get("/", async (req, res) => {
-  try {
-    const { id, user_id } = req.query;
-
-    if (id) {
-      const booking = await EscortBooking.findOne({
-        where: { id: Number(id) || id }
-      });
-      if (!booking) {
-        return res.status(404).json({ message: "Escort booking not found" });
-      }
-      const data = booking.get ? booking.get({ plain: true }) : booking;
-      return res.status(200).json({
-        message: "Escort booking fetched successfully",
-        data
-      });
-    }
-
-    const where = {};
-    if (user_id != null && user_id !== "") {
-      where.user_id = Number(user_id);
-    }
-
-    const bookings = await EscortBooking.findAll({
-      where: Object.keys(where).length ? where : undefined,
-      order: [["created_at", "DESC"]],
-      raw: true
+  if (!service_type_name) {
+    return res.status(400).json({
+      message: "Missing required query parameter: service_type_name",
     });
+  }
 
-    res.status(200).json({
-      message: "Escort bookings list fetched successfully",
-      data: bookings
+  try {
+    // 1) Find the service type id from globalgo_escort_service_type
+    const serviceTypeRows = await sequelize.query(
+      `
+        SELECT id
+        FROM globalgo_escort_service_type
+        WHERE service_type_name = ?
+          AND status = 1
+        LIMIT 1
+      `,
+      {
+        replacements: [service_type_name],
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (serviceTypeRows.length === 0) {
+      return res.status(404).json({
+        message: "Service type not found or inactive",
+      });
+    }
+
+    const serviceTypeId = serviceTypeRows[0].id;
+
+    // 2) Get distinct categories from globalgo_escort_services
+    const categoryRows = await sequelize.query(
+      `
+        SELECT DISTINCT category
+        FROM globalgo_escort_services
+        WHERE service_type_id = ?
+          AND STATUS = 1
+          AND (category IS NOT NULL AND category <> '')
+        ORDER BY category ASC
+      `,
+      {
+        replacements: [serviceTypeId],
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    const categories = categoryRows.map((row) => row.category);
+
+    return res.json({
+      service_type_name,
+      service_type_id: serviceTypeId,
+      categories,
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to fetch escort bookings",
-      error: error.message
+    console.error("Error fetching escort-service categories:", error);
+    return res.status(500).json({
+      message: "Failed to fetch categories",
+      error: error.message,
     });
   }
 });
 
-// GET /my-bookings - Get current user's escort bookings (auth required)
-router.get("/my-bookings", auth, async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ message: "User not authenticated" });
-    }
+/**
+ * GET /escort-service/persons
+ *
+ * Query params:
+ * - service_type_name (string, required)
+ * - category (string, required)
+ *
+ * Returns list of persons/services for a given service type and category.
+ */
+router.get("/persons", async (req, res) => {
+  const { service_type_name, category } = req.query;
 
-    const bookings = await EscortBooking.findAll({
-      where: { user_id: userId },
-      order: [["created_at", "DESC"]],
-      raw: true
-    });
-
-    res.status(200).json({
-      message: "My escort bookings fetched successfully",
-      data: bookings
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to fetch my escort bookings",
-      error: error.message
+  if (!service_type_name || !category) {
+    return res.status(400).json({
+      message:
+        "Missing required query parameters: service_type_name and category",
     });
   }
-});
 
-// POST / - Create escort booking (optional auth: if Bearer token present, auto-fills user_id)
-router.post("/", optionalAuth, async (req, res) => {
   try {
-    const {
-      user_id,
-      full_name,
-      contact_number,
-      email_id,
-      escort_service_type,
-      vip_service_type,
-      request_date,
-      request_time,
-      start_date,
-      end_date,
-      start_time,
-      end_time,
-      location,
-      primary_location,
-      special_requests,
-      additional_notes,
-      additional_locations
-    } = req.body;
-
-    const userId =
-      req.user?.id ??
-      (user_id != null && user_id !== "" ? Number(user_id) : null);
-
-    const reqDateStr = request_date ? parseDateDMY(request_date) || request_date : null;
-    const reqTimeStr = request_time ? parseTime(request_time) || request_time : null;
-    const startDateStr = start_date ? parseDateDMY(start_date) || start_date : null;
-    const endDateStr = end_date ? parseDateDMY(end_date) || end_date : null;
-    const startTimeStr = start_time ? parseTime(start_time) || start_time : null;
-    const endTimeStr = end_time ? parseTime(end_time) || end_time : null;
-    const bookingId = `ESC-${Date.now()}`;
-
-    const booking = await EscortBooking.create({
-      booking_id: bookingId,
-      user_id: userId ?? null,
-      full_name: full_name || null,
-      contact_number: contact_number || null,
-      email_id: email_id || null,
-      escort_service_type: escort_service_type || null,
-      vip_service_type: vip_service_type || null,
-      request_date: reqDateStr,
-      request_time: reqTimeStr,
-      start_date: startDateStr,
-      end_date: endDateStr,
-      start_time: startTimeStr,
-      end_time: endTimeStr,
-      location: location || null,
-      primary_location: primary_location || null,
-      special_requests: special_requests || null,
-      additional_notes: additional_notes || null,
-      additional_locations: additional_locations ? 1 : 0,
-      status: "Pending"
-    });
-
-    const data = booking.get ? booking.get({ plain: true }) : booking;
-
-    res.status(201).json({
-      message: "Escort booking created successfully",
-      user_id: userId,
-      data: {
-        id: data.id,
-        booking_id: data.booking_id,
-        user_id: userId,
-        ...data
+    // 1) Find the service type id
+    const serviceTypeRows = await sequelize.query(
+      `
+        SELECT id
+        FROM globalgo_escort_service_type
+        WHERE service_type_name = ?
+          AND status = 1
+        LIMIT 1
+      `,
+      {
+        replacements: [service_type_name],
+        type: QueryTypes.SELECT,
       }
+    );
+
+    if (serviceTypeRows.length === 0) {
+      return res.status(404).json({
+        message: "Service type not found or inactive",
+      });
+    }
+
+    const serviceTypeId = serviceTypeRows[0].id;
+
+    // 2) Get all persons/services for that type + category
+    const persons = await sequelize.query(
+      `
+        SELECT
+          id,
+          service_type_name,
+          service_type_id,
+          category,
+          title,
+          person_name,
+          person_contact,
+          gender,
+          date_time,
+          guards,
+          price,
+          available,
+          notes,
+          SCHEDULE,
+          hours_per_day,
+          car_model,
+          plate,
+          driver_name,
+          driver_contact,
+          profile_url,
+          extra,
+          STATUS,
+          created_at,
+          updated_at
+        FROM globalgo_escort_services
+        WHERE service_type_id = ?
+          AND category = ?
+          AND STATUS = 1
+        ORDER BY person_name ASC, title ASC
+      `,
+      {
+        replacements: [serviceTypeId, category],
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    return res.json({
+      service_type_name,
+      service_type_id: serviceTypeId,
+      category,
+      persons,
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to create escort booking",
-      error: error.message
+    console.error("Error fetching escort-service persons:", error);
+    return res.status(500).json({
+      message: "Failed to fetch persons",
+      error: error.message,
     });
   }
 });

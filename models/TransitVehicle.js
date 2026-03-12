@@ -63,6 +63,11 @@ const TransitVehicle = sequelize.define(
       type: DataTypes.DECIMAL(10, 7),
       allowNull: true
     },
+    inventory_numbers: {
+      // used as numeric stock/quantity for rentals
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: true

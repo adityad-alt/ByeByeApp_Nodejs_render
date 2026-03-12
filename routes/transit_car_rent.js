@@ -205,7 +205,12 @@ function parseTime(str) {
 }
 
 // Add car rental booking (optional auth: if Bearer token present, auto-fills customer_id from logged-in user)
+// Also decrements vehicle stock and toggles is_available when stock reaches 0.
 router.post("/booking", optionalAuth, async (req, res) => {
+  const t = TransitCarBooking.sequelize?.transaction
+    ? await TransitCarBooking.sequelize.transaction()
+    : null;
+
   try {
     const {
       brand,
@@ -250,27 +255,80 @@ router.post("/booking", optionalAuth, async (req, res) => {
     const startTimeStr = parseTime(start_time) || start_time;
     const endTimeStr = parseTime(end_time) || end_time;
 
-    const booking = await TransitCarBooking.create({
-      brand: brand || null,
-      model: model || null,
-      vehicle_number: vehicle_number || null,
-      customer_id: customerId ?? null,
-      full_name: full_name || null,
-      contact_details: contact_details || null,
-      email_id: email_id || null,
-      address: address || null,
-      start_date: startDateStr,
-      start_time: startTimeStr,
-      end_date: endDateStr,
-      end_time: endTimeStr,
-      driving_license_front: licenseFrontPath || null,
-      driving_license_back: licenseBackPath || null,
-      dob: dob || null,
-      nationality: nationality || null,
-      amount: amount || null,
-      payment_type: payment_type || null,
-      STATUS: "Pending"
+    // Find the corresponding vehicle to adjust stock.
+    const vehicleWhere = {};
+    if (vehicle_number) {
+      vehicleWhere.registration_no = vehicle_number;
+    } else {
+      if (brand) vehicleWhere.brand = brand;
+      if (model) vehicleWhere.model = model;
+    }
+
+    const vehicle = await TransitVehicle.findOne({
+      where: vehicleWhere,
+      transaction: t || undefined
     });
+
+    if (!vehicle) {
+      if (t) await t.rollback();
+      return res.status(404).json({
+        message: "Vehicle not found for booking"
+      });
+    }
+
+    const currentStockRaw =
+      vehicle.inventory_numbers != null
+        ? Number(vehicle.inventory_numbers)
+        : Number(vehicle.inventory_numbers ?? 0);
+    const currentStock = Number.isFinite(currentStockRaw)
+      ? currentStockRaw
+      : 0;
+    const isAvailableFlag =
+      vehicle.is_available === 1 ||
+      vehicle.is_available === true ||
+      vehicle.is_available === "1";
+
+    if (!isAvailableFlag || currentStock <= 0) {
+      if (t) await t.rollback();
+      return res.status(400).json({
+        message: "Vehicle is out of stock"
+      });
+    }
+
+    const booking = await TransitCarBooking.create(
+      {
+        brand: brand || null,
+        model: model || null,
+        vehicle_number: vehicle_number || null,
+        customer_id: customerId ?? null,
+        full_name: full_name || null,
+        contact_details: contact_details || null,
+        email_id: email_id || null,
+        address: address || null,
+        start_date: startDateStr,
+        start_time: startTimeStr,
+        end_date: endDateStr,
+        end_time: endTimeStr,
+        driving_license_front: licenseFrontPath || null,
+        driving_license_back: licenseBackPath || null,
+        dob: dob || null,
+        nationality: nationality || null,
+        amount: amount || null,
+        payment_type: payment_type || null,
+        STATUS: "Pending"
+      },
+      t ? { transaction: t } : undefined
+    );
+
+    // Decrement stock by 1 and toggle availability if needed.
+    const newStock = currentStock - 1;
+    vehicle.inventory_numbers = String(newStock);
+    if (newStock <= 0) {
+      vehicle.is_available = 0;
+    }
+    await vehicle.save(t ? { transaction: t } : undefined);
+
+    if (t) await t.commit();
 
     const data = booking.get ? booking.get({ plain: true }) : booking;
 
@@ -285,6 +343,7 @@ router.post("/booking", optionalAuth, async (req, res) => {
       }
     });
   } catch (error) {
+    if (t) await t.rollback();
     res.status(500).json({
       message: "Failed to create booking",
       error: error.message

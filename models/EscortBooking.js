@@ -101,7 +101,7 @@ const EscortBooking = sequelize.define(
     }
   },
   {
-    tableName: "escort_bookings",
+    tableName: "globalgo_escort_bookings",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"

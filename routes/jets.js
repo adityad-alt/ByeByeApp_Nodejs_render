@@ -216,7 +216,12 @@ router.get("/my-bookings", auth, async (req, res) => {
 });
 
 // POST /jets/booking - Create jet booking (optional auth: if Bearer token present, auto-fills user_id)
+// Also decrements available_stock and sets status to INACTIVE when stock reaches 0.
 router.post("/booking", optionalAuth, async (req, res) => {
+  const t = JetBooking.sequelize?.transaction
+    ? await JetBooking.sequelize.transaction()
+    : null;
+
   try {
     const {
       user_id,
@@ -249,28 +254,75 @@ router.post("/booking", optionalAuth, async (req, res) => {
     const fareNum = parseFare(fare);
     const bookingId = `JET-${Date.now()}`;
 
-    const booking = await JetBooking.create({
-      booking_id: bookingId,
-      user_id: userId ?? null,
-      jet_id: jet_id != null ? Number(jet_id) : null,
-      manufacturer: manufacturer || null,
-      model: model || null,
-      passenger_name: passenger_name || null,
-      contact_number: contact_number || null,
-      email_id: email_id || null,
-      departure: departure || null,
-      destination: destination || null,
-      trip_date: tripDateStr,
-      trip_time: tripTimeStr,
-      return_date: returnDateStr,
-      return_time: returnTimeStr,
-      passengers: passengers || null,
-      jet_type: jet_type || null,
-      fare: fareNum,
-      payment_method: payment_method || null,
-      payment_status: "Pending",
-      booking_status: "Pending"
+    // Find the jet to adjust stock.
+    const where = {};
+    if (jet_id != null) {
+      where.id = Number(jet_id) || jet_id;
+    } else {
+      if (manufacturer) where.manufacturer = manufacturer;
+      if (model) where.model = model;
+    }
+
+    const jet = await Jet.findOne({
+      where,
+      transaction: t || undefined
     });
+
+    if (!jet) {
+      if (t) await t.rollback();
+      return res.status(404).json({
+        message: "Jet not found for booking"
+      });
+    }
+
+    const currentStockRaw =
+      jet.available_stock != null ? Number(jet.available_stock) : 0;
+    const currentStock = Number.isFinite(currentStockRaw) ? currentStockRaw : 0;
+    const isActiveStatus =
+      String(jet.status || "").toUpperCase() === "ACTIVE";
+
+    if (!isActiveStatus || currentStock <= 0) {
+      if (t) await t.rollback();
+      return res.status(400).json({
+        message: "Jet is out of stock"
+      });
+    }
+
+    const booking = await JetBooking.create(
+      {
+        booking_id: bookingId,
+        user_id: userId ?? null,
+        jet_id: jet.id,
+        manufacturer: manufacturer || jet.manufacturer || null,
+        model: model || jet.model || null,
+        passenger_name: passenger_name || null,
+        contact_number: contact_number || null,
+        email_id: email_id || null,
+        departure: departure || jet.departure || null,
+        destination: destination || jet.destination || null,
+        trip_date: tripDateStr,
+        trip_time: tripTimeStr,
+        return_date: returnDateStr,
+        return_time: returnTimeStr,
+        passengers: passengers || null,
+        jet_type: jet_type || jet.jet_type || null,
+        fare: fareNum,
+        payment_method: payment_method || null,
+        payment_status: "Pending",
+        booking_status: "Pending"
+      },
+      t ? { transaction: t } : undefined
+    );
+
+    // Decrement stock and mark inactive when 0.
+    const newStock = currentStock - 1;
+    jet.available_stock = newStock;
+    if (newStock <= 0) {
+      jet.status = "INACTIVE";
+    }
+    await jet.save(t ? { transaction: t } : undefined);
+
+    if (t) await t.commit();
 
     const data = booking.get ? booking.get({ plain: true }) : booking;
 
@@ -286,6 +338,7 @@ router.post("/booking", optionalAuth, async (req, res) => {
       }
     });
   } catch (error) {
+    if (t) await t.rollback();
     res.status(500).json({
       message: "Failed to create jet booking",
       error: error.message
