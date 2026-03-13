@@ -283,7 +283,7 @@ router.post("/destinations", auth, async (req, res) => {
 //   ?id=ID       -> single destination
 //   ?boat_id=ID  -> all destinations for a specific boat
 //   (no id/boat_id) -> all destinations
-router.get("/destinations", auth, async (req, res) => {
+router.get("/destinations", async (req, res) => {
   try {
     const { id, boat_id } = req.query;
 
