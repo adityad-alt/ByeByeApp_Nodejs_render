@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const { Op } = require("sequelize");
 const { TransitVehicle, TransitCarBooking } = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
@@ -36,6 +37,7 @@ function toRad(deg) {
 }
 
 function distanceInKm(lat1, lon1, lat2, lon2) {
+  if (lat2 == null || lon2 == null) return null;
   const n1 = Number(lat1);
   const n2 = Number(lon1);
   const n3 = Number(lat2);
@@ -89,13 +91,14 @@ router.get("/list", async (req, res) => {
             const vLat = item.lat;
             const vLong = item.long;
             const dist = distanceInKm(userLatNum, userLongNum, vLat, vLong);
-            if (dist == null) return null;
             return { ...item, distance_km: dist };
           })
-          .filter((v) => v && v.distance_km <= radius)
+          .filter((v) => v && (v.distance_km == null || v.distance_km <= radius))
           .sort((a, b) => a.distance_km - b.distance_km);
       }
     }
+
+    data = data.map(applyFormattedPrices);
 
     res.status(200).json({
       message: "Transit vehicles list fetched successfully",
@@ -105,6 +108,149 @@ router.get("/list", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to get transit vehicles list",
+      error: error.message
+    });
+  }
+});
+
+// Parse price string (e.g. "KWD 50" or "50.00") to number
+function parsePriceNum(val) {
+  if (val == null) return null;
+  if (typeof val === "number" && !isNaN(val)) return val;
+  const s = String(val).trim().replace(/[^\d.]/g, "");
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+// Format price for API: returns numeric string (e.g. "35.222"). Returns null for dummy/invalid.
+// Currency is in separate column, no need to prepend it to price.
+function formatTransitPrice(val) {
+  if (val == null || val === "") return null;
+  const s = String(val).trim();
+  if (!s || s.length > 50) return null;
+  const num = parsePriceNum(s);
+  if (num == null || !Number.isFinite(num)) return null;
+  return Number(num).toFixed(3).replace(/\.?0+$/, "");
+}
+
+// Apply formatted prices to vehicle for API response (uses currency col for reference)
+function applyFormattedPrices(item) {
+  if (!item || typeof item !== "object") return item;
+  const curr = item.currency || "KWD";
+  const ph = formatTransitPrice(item.price_per_hour);
+  const pd = formatTransitPrice(item.price_per_day);
+  return { ...item, price_per_hour: ph ?? pd, price_per_day: pd ?? ph, currency: curr };
+}
+
+// GET /transit-car-rent/filter - Filter vehicles by brand, model, fuel_type, price, seat_capacity, location
+router.get("/filter", async (req, res) => {
+  try {
+    const {
+      lat: userLat,
+      long: userLong,
+      radius_km: radiusKm,
+      brand,
+      model,
+      fuel_type,
+      min_price,
+      max_price,
+      seat_capacity
+    } = req.query;
+
+    const vehicles = await TransitVehicle.findAll({
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ],
+      raw: true
+    });
+
+    let data = vehicles;
+
+    // Apply brand filter
+    if (brand && String(brand).trim() !== "") {
+      data = data.filter(
+        (v) => String(v.brand || "").toLowerCase() === String(brand).trim().toLowerCase()
+      );
+    }
+
+    // Apply model filter
+    if (model && String(model).trim() !== "") {
+      data = data.filter(
+        (v) => String(v.model || "").toLowerCase() === String(model).trim().toLowerCase()
+      );
+    }
+
+    // Apply fuel_type filter
+    if (fuel_type && String(fuel_type).trim() !== "") {
+      data = data.filter(
+        (v) =>
+          String(v.fuel_type || "").toLowerCase() === String(fuel_type).trim().toLowerCase()
+      );
+    }
+
+    // Apply seat_capacity filter
+    if (seat_capacity != null && seat_capacity !== "") {
+      const cap = Number(seat_capacity);
+      if (Number.isFinite(cap)) {
+        data = data.filter((v) => Number(v.seat_capacity) >= cap);
+      }
+    }
+
+    // Apply price filter (price_per_day only)
+    const minP = min_price != null && min_price !== "" ? parsePriceNum(min_price) : null;
+    const maxP = max_price != null && max_price !== "" ? parsePriceNum(max_price) : null;
+    if (minP != null || maxP != null) {
+      data = data.filter((v) => {
+        const pd = parsePriceNum(v.price_per_day);
+        if (pd == null) return true; // Include vehicles with no price data
+        if (minP != null && pd < minP) return false;
+        if (maxP != null && pd > maxP) return false;
+        return true;
+      });
+    }
+
+    // Apply location radius filter
+    const hasUserLocation =
+      userLat != null && userLat !== "" && userLong != null && userLong !== "";
+    const parsedRadius =
+      radiusKm != null && radiusKm !== "" ? Number(radiusKm) : 100;
+    const radius =
+      Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 100;
+
+    if (hasUserLocation) {
+      const userLatNum = Number(userLat);
+      const userLongNum = Number(userLong);
+
+      if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
+        const withDist = data.map((item) => {
+          const vLat = item.lat;
+          const vLong = item.long;
+          // Null/undefined coords = unknown location; treat as null distance (include in noLocation)
+          if (vLat == null || vLong == null || Number.isNaN(Number(vLat)) || Number.isNaN(Number(vLong))) {
+            return { ...item, distance_km: null };
+          }
+          const dist = distanceInKm(userLatNum, userLongNum, vLat, vLong);
+          return { ...item, distance_km: dist };
+        });
+        const inRadius = withDist.filter(
+          (v) => v.distance_km != null && v.distance_km <= radius
+        );
+        const noLocation = withDist.filter((v) => v.distance_km == null);
+        data = [...inRadius.sort((a, b) => a.distance_km - b.distance_km), ...noLocation];
+      }
+    }
+
+    data = data.map(applyFormattedPrices);
+
+    res.status(200).json({
+      message: "Filtered vehicles fetched successfully",
+      table_name: TransitVehicle.tableName || "globalgo_vehicles",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to filter transit vehicles",
       error: error.message
     });
   }

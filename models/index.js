@@ -36,13 +36,15 @@ const BoatAddonItem = require("./BoatAddonItem");
 const BoatSpecialPackage = require("./BoatSpecialPackage");
 const BoatProduct = require("./BoatProduct");
 const BoatAddonRestaurant = require("./BoatAddonRestaurant");
-    const ChaletAddonItem = require("./ChaletAddonItem");
+const ChaletAddonItem = require("./ChaletAddonItem");
 const ChaletSpecialPackage = require("./ChaletSpecialPackage");
 const ChaletAddonRestaurant = require("./ChaletAddonRestaurant");
 const BoatProductCategory = require("./BoatProductCategory");
 const BoatBookingAddon = require("./BoatBookingAddon");
 const BoatDestination = require("./BoatDestination");
 const BluewavePolicy = require("./BluewavePolicy");
+const BYEFeedback = require("./BYEFeedback");
+const AboutUs = require("./AboutUs");
 
 // Shop order associations
 ShopOrder.hasMany(ShopOrderItem, { foreignKey: "order_id", as: "ShopOrderItems" });
@@ -93,5 +95,7 @@ module.exports = {
   ChaletAddonItem,
   ChaletSpecialPackage,
   ChaletAddonRestaurant,
-  BluewavePolicy
+  BluewavePolicy,
+  BYEFeedback,
+  AboutUs
 };

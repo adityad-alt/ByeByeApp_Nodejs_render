@@ -9,6 +9,7 @@ const {
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
 const router = express.Router();
+const { Op } = require("sequelize");
 
 // GET /chalets — health check for chalet API
 router.get("/", (req, res) => {
@@ -141,6 +142,154 @@ const listChalets = async (req, res) => {
 };
 router.get("/list", listChalets);
 router.get("/list/", listChalets);
+
+// GET /chalets/filter-chalets
+// Filters:
+// - lat, long, radius_km: location radius filter (km)
+// - min_price, max_price: numeric range on price_per_night
+// - min_guests, max_guests: range on max_guests
+// - min_bedrooms, max_bedrooms: range on bedrooms
+// - min_bathrooms, max_bathrooms: range on bathrooms
+// - amenities: comma-separated list matched against amenities_json (LIKE)
+router.get("/filter-chalets", async (req, res) => {
+  try {
+    const {
+      lat: userLat,
+      long: userLong,
+      radius_km: radiusKm,
+      min_price,
+      max_price,
+      min_guests,
+      max_guests,
+      min_bedrooms,
+      max_bedrooms,
+      min_bathrooms,
+      max_bathrooms,
+      amenities
+    } = req.query;
+
+    const where = {};
+    const andConditions = [];
+
+    // Price range
+    if (min_price != null || max_price != null) {
+      where.price_per_night = {};
+      if (min_price != null && String(min_price).trim() !== "") {
+        where.price_per_night[Op.gte] = Number(min_price);
+      }
+      if (max_price != null && String(max_price).trim() !== "") {
+        where.price_per_night[Op.lte] = Number(max_price);
+      }
+    }
+
+    // Guests
+    if (min_guests != null || max_guests != null) {
+      where.max_guests = {};
+      if (min_guests != null && String(min_guests).trim() !== "") {
+        where.max_guests[Op.gte] = Number(min_guests);
+      }
+      if (max_guests != null && String(max_guests).trim() !== "") {
+        where.max_guests[Op.lte] = Number(max_guests);
+      }
+    }
+
+    // Bedrooms
+    if (min_bedrooms != null || max_bedrooms != null) {
+      where.bedrooms = {};
+      if (min_bedrooms != null && String(min_bedrooms).trim() !== "") {
+        where.bedrooms[Op.gte] = Number(min_bedrooms);
+      }
+      if (max_bedrooms != null && String(max_bedrooms).trim() !== "") {
+        where.bedrooms[Op.lte] = Number(max_bedrooms);
+      }
+    }
+
+    // Bathrooms
+    if (min_bathrooms != null || max_bathrooms != null) {
+      where.bathrooms = {};
+      if (min_bathrooms != null && String(min_bathrooms).trim() !== "") {
+        where.bathrooms[Op.gte] = Number(min_bathrooms);
+      }
+      if (max_bathrooms != null && String(max_bathrooms).trim() !== "") {
+        where.bathrooms[Op.lte] = Number(max_bathrooms);
+      }
+    }
+
+    // Amenities filter on amenities_json
+    if (amenities != null && String(amenities).trim() !== "") {
+      const amenityList = String(amenities)
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+
+      if (amenityList.length > 0) {
+        for (const amenity of amenityList) {
+          andConditions.push({
+            amenities_json: {
+              [Op.like]: `%${amenity}%`
+            }
+          });
+        }
+      }
+    }
+
+    const finalWhere =
+      andConditions.length > 0
+        ? {
+            ...where,
+            [Op.and]: andConditions
+          }
+        : where;
+
+    const list = await Chalet.findAll({
+      attributes: CHALET_ATTRIBUTES,
+      where: Object.keys(finalWhere).length ? finalWhere : undefined,
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ]
+    });
+
+    const normalized = list.map(normalizeChaletListItem).filter(Boolean);
+
+    let data = normalized;
+
+    const hasUserLocation =
+      userLat != null && userLat !== "" && userLong != null && userLong !== "";
+    const parsedRadius =
+      radiusKm != null && radiusKm !== "" ? Number(radiusKm) : 100;
+    const radius =
+      Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 100;
+
+    if (hasUserLocation) {
+      const userLatNum = Number(userLat);
+      const userLongNum = Number(userLong);
+
+      if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
+        data = normalized
+          .map((item) => {
+            const cLat = item.lat;
+            const cLong = item.long;
+            const dist = distanceInKm(userLatNum, userLongNum, cLat, cLong);
+            if (dist == null) return null;
+            return { ...item, distance_km: dist };
+          })
+          .filter((c) => c && c.distance_km <= radius)
+          .sort((a, b) => a.distance_km - b.distance_km);
+      }
+    }
+
+    res.status(200).json({
+      message: "Filtered chalet list fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get filtered chalet list",
+      error: error.message
+    });
+  }
+});
 
 // ——— Chalet Bookings (table: chalet_bookings) ———
 

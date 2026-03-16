@@ -46,6 +46,11 @@ const TransitVehicle = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true
     },
+    currency: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      defaultValue: "KWD"
+    },
     is_available: {
       type: DataTypes.TINYINT,
       allowNull: true,

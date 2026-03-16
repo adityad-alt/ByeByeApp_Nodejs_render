@@ -78,6 +78,79 @@ router.get("/categories", async (req, res) => {
 });
 
 /**
+ * GET /escort-service/filter
+ *
+ * Query params: service_type_name, category, gender, min_price, max_price (all optional)
+ * Returns list of escort services matching filters from globalgo_escort_services.
+ */
+router.get("/filter", async (req, res) => {
+  const { service_type_name, category, gender, min_price, max_price } = req.query;
+
+  try {
+    let sql = `
+      SELECT
+        id, service_type_name, service_type_id, category, title,
+        person_name, person_contact, gender, date_time, guards, price,
+        available, notes, SCHEDULE, hours_per_day, car_model, plate,
+        driver_name, driver_contact, profile_url, extra, STATUS,
+        created_at, updated_at
+      FROM globalgo_escort_services
+      WHERE STATUS = 1
+    `;
+    const replacements = [];
+    let idx = 1;
+
+    if (service_type_name && String(service_type_name).trim()) {
+      sql += ` AND service_type_name = ?`;
+      replacements.push(String(service_type_name).trim());
+      idx++;
+    }
+    if (category && String(category).trim()) {
+      sql += ` AND category = ?`;
+      replacements.push(String(category).trim());
+      idx++;
+    }
+    if (gender && String(gender).trim()) {
+      sql += ` AND gender = ?`;
+      replacements.push(String(gender).trim());
+      idx++;
+    }
+    if (min_price != null && min_price !== "") {
+      const n = parseFloat(String(min_price));
+      if (!isNaN(n)) {
+        sql += ` AND CAST(price AS DECIMAL(10,2)) >= ?`;
+        replacements.push(n);
+      }
+    }
+    if (max_price != null && max_price !== "") {
+      const n = parseFloat(String(max_price));
+      if (!isNaN(n)) {
+        sql += ` AND CAST(price AS DECIMAL(10,2)) <= ?`;
+        replacements.push(n);
+      }
+    }
+
+    sql += ` ORDER BY person_name ASC, title ASC`;
+
+    const persons = await sequelize.query(sql, {
+      replacements,
+      type: QueryTypes.SELECT,
+    });
+
+    return res.json({
+      message: "Filtered escort services fetched successfully",
+      data: persons,
+    });
+  } catch (error) {
+    console.error("Error fetching escort-service filter:", error);
+    return res.status(500).json({
+      message: "Failed to fetch escort services",
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /escort-service/persons
  *
  * Query params:

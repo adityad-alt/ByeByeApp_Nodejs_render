@@ -30,6 +30,8 @@ const chaletRoutes = require("./routes/chalet");
 const catererRoutes = require("./routes/caterer");
 const shopRoutes = require("./routes/shop");
 const notificationsRoutes = require("./routes/notifications");
+const appPolicyRoutes = require("./routes/app_policy");
+const aboutUsRoutes = require("./routes/about_us");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -91,8 +93,7 @@ app.use("/user-details", userDetailsRoutes);
 app.use("/transit-car-rent", transitCarRentRoutes);
 app.use("/transit-trip-booking", transitTripBookingRoutes);
 app.use("/jets", jetsRoutes);
-// All escort-service details routes require authentication
-app.use("/escort-service", auth, escortServiceRoutes);
+app.use("/escort-service", escortServiceRoutes);
 // Escort service bookings (uses own auth/optionalAuth per route)
 app.use("/escort-service-bookings", escortServiceBookingsRoutes);
 app.use("/delivery", deliveryRoutes);
@@ -100,6 +101,8 @@ app.use("/chalets", chaletRoutes);
 app.use("/caterer", catererRoutes);
 app.use("/shop", shopRoutes);
 app.use("/notifications", notificationsRoutes);
+app.use("/app-policies", appPolicyRoutes);
+app.use("/about-us", aboutUsRoutes);
 
 const startServer = async () => {
   try {

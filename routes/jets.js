@@ -1,8 +1,13 @@
 const express = require("express");
+const { Op } = require("sequelize");
 const { Jet, JetBooking } = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
 const router = express.Router();
+
+// Note: Previously dummy/placeholder jets (e.g. names containing "Dummy" or "globalgo_jets")
+// were excluded via a Sequelize WHERE clause. That logic has been removed so that
+// those rows are now included in API responses as requested.
 
 // Haversine helpers: distance between two lat/long points in kilometers
 function toRad(deg) {
@@ -10,6 +15,7 @@ function toRad(deg) {
 }
 
 function distanceInKm(lat1, lon1, lat2, lon2) {
+  if (lat2 == null || lon2 == null) return null;
   const n1 = Number(lat1);
   const n2 = Number(lon1);
   const n3 = Number(lat2);
@@ -58,6 +64,154 @@ function parseFare(str) {
   return isNaN(n) ? null : n;
 }
 
+function parsePriceToNum(val) {
+  if (val == null) return null;
+  if (typeof val === "number" && !Number.isNaN(val)) return val;
+  const s = String(val).trim().replace(/[^\d.]/g, "");
+  const n = parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+}
+
+// Format jet price for API: returns numeric string (e.g. "35.222"). Returns null for invalid strings.
+function formatJetPrice(val) {
+  if (val == null || val === "") return null;
+  const s = String(val).trim();
+  if (!s || s.length > 50) return null;
+  const num = parsePriceToNum(s);
+  if (num == null || !Number.isFinite(num)) return null;
+  return Number(num).toFixed(3).replace(/\.?0+$/, "");
+}
+
+// Apply formatted prices to jet for API response
+function applyFormattedJets(item) {
+  if (!item || typeof item !== "object") return item;
+  const ph = formatJetPrice(item.price_per_hour);
+  const pt = formatJetPrice(item.price_per_trip);
+  return { ...item, price_per_hour: ph ?? pt, price_per_trip: pt ?? ph };
+}
+
+// GET /jets/filter - Filter jets by jet_type, manufacturer, model, departure, destination,
+// passenger_capacity, cruise_speed, price, location
+router.get("/filter", async (req, res) => {
+  try {
+    const {
+      jet_type,
+      manufacturer,
+      model,
+      departure,
+      destination,
+      passenger_capacity,
+      min_speed,
+      max_speed,
+      min_price,
+      max_price,
+      lat: userLat,
+      long: userLong,
+      radius_km: radiusKm
+    } = req.query;
+
+    const andConditions = [{ status: "ACTIVE" }];
+    if (jet_type && String(jet_type).trim()) {
+      andConditions.push({ jet_type: { [Op.like]: `%${String(jet_type).trim()}%` } });
+    }
+    if (manufacturer && String(manufacturer).trim()) {
+      andConditions.push({ manufacturer: { [Op.like]: `%${String(manufacturer).trim()}%` } });
+    }
+    if (model && String(model).trim()) {
+      andConditions.push({ model: { [Op.like]: `%${String(model).trim()}%` } });
+    }
+    if (departure && String(departure).trim()) {
+      andConditions.push({ departure: { [Op.like]: `%${String(departure).trim()}%` } });
+    }
+    if (destination && String(destination).trim()) {
+      andConditions.push({ destination: { [Op.like]: `%${String(destination).trim()}%` } });
+    }
+    if (passenger_capacity != null && passenger_capacity !== "") {
+      const cap = Number(passenger_capacity);
+      if (Number.isFinite(cap)) andConditions.push({ passenger_capacity: cap });
+    }
+
+    const jets = await Jet.findAll({
+      where: { [Op.and]: andConditions },
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ],
+      raw: true
+    });
+
+    let data = jets.map((j) => (j.get ? j.get({ plain: true }) : j));
+
+    const minSpeedNum = min_speed != null && min_speed !== "" ? Number(min_speed) : null;
+    const maxSpeedNum = max_speed != null && max_speed !== "" ? Number(max_speed) : null;
+    if (minSpeedNum != null && Number.isFinite(minSpeedNum)) {
+      data = data.filter((j) => {
+        const s = Number(j.cruise_speed_kmh);
+        return Number.isFinite(s) && s >= minSpeedNum;
+      });
+    }
+    if (maxSpeedNum != null && Number.isFinite(maxSpeedNum)) {
+      data = data.filter((j) => {
+        const s = Number(j.cruise_speed_kmh);
+        return Number.isFinite(s) && s <= maxSpeedNum;
+      });
+    }
+
+    const minPriceNum = min_price != null && min_price !== "" ? parsePriceToNum(min_price) : null;
+    const maxPriceNum = max_price != null && max_price !== "" ? parsePriceToNum(max_price) : null;
+    if (minPriceNum != null || maxPriceNum != null) {
+      data = data.filter((j) => {
+        const ph = parsePriceToNum(j.price_per_hour);
+        const pt = parsePriceToNum(j.price_per_trip);
+        const p = Math.min(ph ?? Infinity, pt ?? Infinity);
+        const pMax = Math.max(ph ?? 0, pt ?? 0);
+        if (p === Infinity && pMax === 0) return true; // Include jets with no price data
+        if (minPriceNum != null && Number.isFinite(minPriceNum) && p < minPriceNum) return false;
+        if (maxPriceNum != null && Number.isFinite(maxPriceNum) && pMax > maxPriceNum) return false;
+        return true;
+      });
+    }
+
+    const hasUserLocation =
+      userLat != null && userLat !== "" && userLong != null && userLong !== "";
+    const parsedRadius =
+      radiusKm != null && radiusKm !== "" ? Number(radiusKm) : 100;
+    const radius =
+      Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 100;
+
+    if (hasUserLocation) {
+      const userLatNum = Number(userLat);
+      const userLongNum = Number(userLong);
+      if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
+        const withDist = data.map((item) => {
+          const jetLat = item.lat;
+          const jetLong = item.long;
+          if (jetLat == null || jetLong == null || Number.isNaN(Number(jetLat)) || Number.isNaN(Number(jetLong))) {
+            return { ...item, distance_km: null };
+          }
+          const dist = distanceInKm(userLatNum, userLongNum, jetLat, jetLong);
+          return { ...item, distance_km: dist };
+        });
+        const inRadius = withDist.filter((j) => j.distance_km != null && j.distance_km <= radius);
+        const noLocation = withDist.filter((j) => j.distance_km == null);
+        data = [...inRadius.sort((a, b) => a.distance_km - b.distance_km), ...noLocation];
+      }
+    }
+
+    data = data.map(applyFormattedJets);
+
+    res.status(200).json({
+      message: "Filtered jets fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to filter jets",
+      error: error.message
+    });
+  }
+});
+
 // GET / - List jets (optional:
 // - status=ACTIVE|INACTIVE
 // - id= for single jet
@@ -65,10 +219,9 @@ function parseFare(str) {
 router.get("/", async (req, res) => {
   try {
     const { status, id, lat: userLat, long: userLong, radius_km: radiusKm } = req.query;
-    const where = {};
-
+    const andConditions = [];
     if (status && ["ACTIVE", "INACTIVE"].includes(String(status).toUpperCase())) {
-      where.status = String(status).toUpperCase();
+      andConditions.push({ status: String(status).toUpperCase() });
     }
 
     if (id) {
@@ -78,15 +231,17 @@ router.get("/", async (req, res) => {
       if (!jet) {
         return res.status(404).json({ message: "Jet not found" });
       }
-      const data = jet.get ? jet.get({ plain: true }) : jet;
+      const plain = jet.get ? jet.get({ plain: true }) : jet;
+      const data = applyFormattedJets(plain);
       return res.status(200).json({
         message: "Jet fetched successfully",
         data
       });
     }
 
+    const listWhere = { [Op.and]: andConditions };
     const jets = await Jet.findAll({
-      where: Object.keys(where).length ? where : undefined,
+      where: listWhere,
       order: [
         ["created_at", "DESC"],
         ["id", "DESC"]
@@ -108,18 +263,22 @@ router.get("/", async (req, res) => {
       const userLongNum = Number(userLong);
 
       if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
-        data = jets
-          .map((item) => {
-            const jetLat = item.lat;
-            const jetLong = item.long;
-            const dist = distanceInKm(userLatNum, userLongNum, jetLat, jetLong);
-            if (dist == null) return null;
-            return { ...item, distance_km: dist };
-          })
-          .filter((j) => j && j.distance_km <= radius)
-          .sort((a, b) => a.distance_km - b.distance_km);
+        const withDist = jets.map((item) => {
+          const jetLat = item.lat;
+          const jetLong = item.long;
+          if (jetLat == null || jetLong == null || Number.isNaN(Number(jetLat)) || Number.isNaN(Number(jetLong))) {
+            return { ...item, distance_km: null };
+          }
+          const dist = distanceInKm(userLatNum, userLongNum, jetLat, jetLong);
+          return { ...item, distance_km: dist };
+        });
+        const inRadius = withDist.filter((j) => j.distance_km != null && j.distance_km <= radius);
+        const noLocation = withDist.filter((j) => j.distance_km == null);
+        data = [...inRadius.sort((a, b) => a.distance_km - b.distance_km), ...noLocation];
       }
     }
+
+    data = data.map(applyFormattedJets);
 
     res.status(200).json({
       message: "Jets list fetched successfully",

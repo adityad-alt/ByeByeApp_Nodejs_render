@@ -10,7 +10,7 @@ const {
   BoatAddonRestaurant,
   BoatProductCategory
 } = require("../models");
-const { Sequelize } = require("sequelize");
+const { Sequelize, Op } = require("sequelize");
 
 const router = express.Router();
 
@@ -136,6 +136,122 @@ router.get("/all-boat-list", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to get boat list", error: error.message });
+  }
+});
+
+// Filter boats by multiple criteria: amenities, price range, capacity, and location (lat/long)
+// GET /boats/filter-boats
+// Query params (all optional, combined with AND):
+// - amenities: comma-separated list of amenity names/keywords
+// - min_price, max_price: numeric range for price_per_hour
+// - min_capacity, max_capacity: numeric range for capacity
+// - lat, long, radius_km: filter boats within radius (km) of this point
+router.get("/filter-boats", async (req, res) => {
+  try {
+    const {
+      amenities,
+      min_price,
+      max_price,
+      min_capacity,
+      max_capacity,
+      lat: userLat,
+      long: userLong,
+      radius_km: radiusKm
+    } = req.query;
+
+    const where = {};
+    const andConditions = [];
+
+    // Price range filter (price_per_hour)
+    if (min_price != null || max_price != null) {
+      where.price_per_hour = {};
+      if (min_price != null && String(min_price).trim() !== "") {
+        where.price_per_hour[Op.gte] = Number(min_price);
+      }
+      if (max_price != null && String(max_price).trim() !== "") {
+        where.price_per_hour[Op.lte] = Number(max_price);
+      }
+    }
+
+    // Capacity range filter
+    if (min_capacity != null || max_capacity != null) {
+      where.capacity = {};
+      if (min_capacity != null && String(min_capacity).trim() !== "") {
+        where.capacity[Op.gte] = Number(min_capacity);
+      }
+      if (max_capacity != null && String(max_capacity).trim() !== "") {
+        where.capacity[Op.lte] = Number(max_capacity);
+      }
+    }
+
+    // Amenities filter: basic LIKE search on JSON/text column
+    if (amenities != null && String(amenities).trim() !== "") {
+      const amenityList = String(amenities)
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+
+      if (amenityList.length > 0) {
+        for (const amenity of amenityList) {
+          andConditions.push({
+            amenities: {
+              [Op.like]: `%${amenity}%`
+            }
+          });
+        }
+      }
+    }
+
+    const finalWhere =
+      andConditions.length > 0
+        ? {
+            ...where,
+            [Op.and]: andConditions
+          }
+        : where;
+
+    let boatList = await Boat.findAll({
+      where: Object.keys(finalWhere).length ? finalWhere : undefined,
+      order: [
+        ["created_at", "DESC"],
+        ["id", "DESC"]
+      ]
+    });
+
+    let data = boatList.map(normalizeBoat);
+
+    // Optional location filter based on user's lat/long
+    const hasUserLocation =
+      userLat != null && userLat !== "" && userLong != null && userLong !== "";
+    const radius = radiusKm != null && radiusKm !== "" ? Number(radiusKm) : 100;
+
+    if (hasUserLocation) {
+      const userLatNum = Number(userLat);
+      const userLongNum = Number(userLong);
+
+      if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
+        data = data
+          .map((boat) => {
+            const boatLat = boat.lat ?? boat.latitude;
+            const boatLong = boat.long ?? boat.longitude;
+            const dist = distanceInKm(userLatNum, userLongNum, boatLat, boatLong);
+            if (dist == null) return null;
+            return { ...boat, distance_km: dist };
+          })
+          .filter((b) => b && b.distance_km <= radius)
+          .sort((a, b) => a.distance_km - b.distance_km);
+      }
+    }
+
+    res.status(200).json({
+      message: "Filtered boat list fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get filtered boat list",
+      error: error.message
+    });
   }
 });
 
