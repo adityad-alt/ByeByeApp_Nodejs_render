@@ -1,8 +1,8 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../db");
 
-const ChaletAddonRestaurant = sequelize.define(
-  "ChaletAddonRestaurant",
+const BluewaveAddonRestaurant = sequelize.define(
+  "BluewaveAddonRestaurant",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -39,12 +39,11 @@ const ChaletAddonRestaurant = sequelize.define(
     }
   },
   {
-    tableName: "allora_chalet_addon_restaurants",
+    tableName: "bluewave_addon_restaurants",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
   }
 );
 
-module.exports = ChaletAddonRestaurant;
-
+module.exports = BluewaveAddonRestaurant;

@@ -1,4 +1,5 @@
 const express = require("express");
+const { Op } = require("sequelize");
 const { Seafarer, SeafarerTransaction } = require("../models");
 const router = express.Router();
 
@@ -13,14 +14,44 @@ function normalizeSeafarer(seafarer) {
   return { ...row };
 }
 
-// Get seafarers list (all or by status, optional id for single)
+// Get unique seafarer categories (specialties) - for UI tabs
+router.get("/categories", async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = { specialty: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }] } };
+    if (status && ["active", "inactive", "blocked"].includes(String(status).toLowerCase())) {
+      where.STATUS = String(status).toLowerCase();
+    }
+    const rows = await Seafarer.findAll({
+      attributes: ["specialty"],
+      where,
+      raw: true
+    });
+    const categories = [...new Set(rows.map((r) => (r.specialty || "").trim()).filter(Boolean))].sort();
+    res.status(200).json({
+      message: "Seafarer categories fetched successfully",
+      data: categories
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get seafarer categories",
+      error: error.message
+    });
+  }
+});
+
+// Get seafarers list (all or by status, optional id for single, optional category/specialty filter)
 router.get("/list", async (req, res) => {
   try {
-    const { id, status } = req.query;
+    const { id, status, category } = req.query;
     const where = {};
 
     if (status && ["active", "inactive", "blocked"].includes(String(status).toLowerCase())) {
       where.STATUS = String(status).toLowerCase();
+    }
+
+    if (category && String(category).trim()) {
+      where.specialty = { [Op.like]: String(category).trim() };
     }
 
     if (id) {

@@ -20,7 +20,10 @@ const Jet = require("./Jet");
 const JetBooking = require("./JetBooking");
 const EscortBooking = require("./EscortBooking");
 const DeliveryOrder = require("./DeliveryOrder");
-const DeliverySelectionConfig = require("./DeliverySelectionConfig");
+const GlobalgoLocalShipment = require("./GlobalgoLocalShipment");
+const GlobalgoSeaCargoShipment = require("./GlobalgoSeaCargoShipment");
+const GlobalgoInternationalShipment = require("./GlobalgoInternationalShipment");
+const GlobalgoCarShipment = require("./GlobalgoCarShipment");
 const Chalet = require("./Chalet");
 const ChaletBooking = require("./ChaletBooking");
 const CateringOrder = require("./CateringOrder");
@@ -36,9 +39,15 @@ const BoatAddonItem = require("./BoatAddonItem");
 const BoatSpecialPackage = require("./BoatSpecialPackage");
 const BoatProduct = require("./BoatProduct");
 const BoatAddonRestaurant = require("./BoatAddonRestaurant");
+const BoatAddonRestaurantCategory = require("./BoatAddonRestaurantCategory");
+const BluewaveAddonRestaurant = require("./BluewaveAddonRestaurant");
+const BluewaveAddMenu = require("./BluewaveAddMenu");
 const ChaletAddonItem = require("./ChaletAddonItem");
 const ChaletSpecialPackage = require("./ChaletSpecialPackage");
 const ChaletAddonRestaurant = require("./ChaletAddonRestaurant");
+const ChaletAddonRestaurantCategory = require("./ChaletAddonRestaurantCategory");
+const ChaletAddMenu = require("./ChaletAddMenu");
+const ChaletCategory = require("./ChaletCategory");
 const BoatProductCategory = require("./BoatProductCategory");
 const BoatBookingAddon = require("./BoatBookingAddon");
 const BoatDestination = require("./BoatDestination");
@@ -73,7 +82,10 @@ module.exports = {
   JetBooking,
   EscortBooking,
   DeliveryOrder,
-  DeliverySelectionConfig,
+  GlobalgoLocalShipment,
+  GlobalgoSeaCargoShipment,
+  GlobalgoInternationalShipment,
+  GlobalgoCarShipment,
   Chalet,
   ChaletBooking,
   CateringOrder,
@@ -87,6 +99,9 @@ module.exports = {
   BoatSpecialPackage,
   BoatProduct,
   BoatAddonRestaurant,
+  BoatAddonRestaurantCategory,
+  BluewaveAddonRestaurant,
+  BluewaveAddMenu,
   BoatProductCategory,
   BoatBookingAddon,
   BoatDestination,
@@ -95,6 +110,9 @@ module.exports = {
   ChaletAddonItem,
   ChaletSpecialPackage,
   ChaletAddonRestaurant,
+  ChaletAddonRestaurantCategory,
+  ChaletAddMenu,
+  ChaletCategory,
   BluewavePolicy,
   BYEFeedback,
   AboutUs

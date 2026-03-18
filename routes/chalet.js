@@ -4,7 +4,10 @@ const {
   ChaletBooking,
   ChaletAddonItem,
   ChaletSpecialPackage,
-  ChaletAddonRestaurant
+  ChaletAddonRestaurant,
+  ChaletAddonRestaurantCategory,
+  ChaletAddMenu,
+  ChaletCategory
 } = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
@@ -595,14 +598,11 @@ router.get("/addon-restaurants", async (req, res) => {
     };
 
     const data = rows.map((r) => {
-      const categories = parseJson(r.categories);
       const images = parseJson(r.images);
-      const items = parseJson(r.items);
       return {
         ...r,
-        categories: Array.isArray(categories) ? categories : categories,
         images: Array.isArray(images) ? images : images,
-        items: Array.isArray(items) ? items : items
+        image_url: Array.isArray(images) && images[0] ? images[0] : (r.images || null)
       };
     });
 
@@ -613,6 +613,195 @@ router.get("/addon-restaurants", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to get chalet addon restaurants",
+      error: error.message
+    });
+  }
+});
+
+// Fetch chalet addon restaurant categories from allora_chalet_addon_restaurant_category table
+router.get("/addon-restaurants-category", async (req, res) => {
+  try {
+    const rows = await ChaletAddonRestaurantCategory.findAll({
+      order: [["category_name", "ASC"]],
+      raw: true
+    });
+
+    res.status(200).json({
+      message: "Chalet addon restaurant categories fetched successfully",
+      data: rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet addon restaurant categories",
+      error: error.message
+    });
+  }
+});
+
+// Fetch chalet addon restaurants with category names
+// (join allora_chalet_addon_restaurants + allora_chalet_addon_restaurant_category)
+router.get("/addon-restaurants-with-categories", async (req, res) => {
+  try {
+    const restaurants = await ChaletAddonRestaurant.findAll({
+      order: [["restaurant_name", "ASC"]],
+      raw: true
+    });
+    const categories = await ChaletAddonRestaurantCategory.findAll({
+      raw: true
+    });
+
+    const parseJson = (val) => {
+      if (val == null) return val;
+      if (typeof val === "string") {
+        try {
+          return JSON.parse(val);
+        } catch (_) {
+          if (String(val).includes(",")) {
+            return String(val).split(",").map((s) => s.trim()).filter(Boolean);
+          }
+          return val;
+        }
+      }
+      return val;
+    };
+
+    const catByRestaurant = {};
+    for (const c of categories) {
+      const rid = c.restaurant_id;
+      if (rid == null) continue;
+      const key = String(rid);
+      if (!catByRestaurant[key]) catByRestaurant[key] = [];
+      const name = (c.category_name || "").trim();
+      if (name && !catByRestaurant[key].includes(name)) {
+        catByRestaurant[key].push(name);
+      }
+    }
+
+    const data = restaurants.map((r) => {
+      const images = parseJson(r.images);
+      const catList = catByRestaurant[String(r.id)] || [];
+      return {
+        ...r,
+        images: Array.isArray(images) ? images : images,
+        image_url: Array.isArray(images) && images[0] ? images[0] : (r.images || null),
+        categories: catList
+      };
+    });
+
+    res.status(200).json({
+      message: "Chalet addon restaurants with categories fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet addon restaurants with categories",
+      error: error.message
+    });
+  }
+});
+
+// Fetch chalet restaurant menu items by restaurant_id (allora_chalet_add_menu)
+// GET /chalets/addon-restaurant-items?restaurant_id=1
+router.get("/addon-restaurant-items", async (req, res) => {
+  try {
+    const { restaurant_id: restaurantId } = req.query;
+
+    if (!restaurantId || String(restaurantId).trim() === "") {
+      return res.status(400).json({
+        message: "restaurant_id query param is required"
+      });
+    }
+
+    const items = await ChaletAddMenu.findAll({
+      where: { restaurant_id: Number(restaurantId) },
+      order: [["item_name", "ASC"]],
+      raw: true
+    });
+
+    const parseImages = (val) => {
+      if (val == null || val === "") return [];
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [val.trim()];
+        } catch (_) {
+          if (String(val).includes(",")) {
+            return String(val).split(",").map((s) => s.trim()).filter(Boolean);
+          }
+          return val.trim() ? [val.trim()] : [];
+        }
+      }
+      return [];
+    };
+
+    const data = items.map((r) => {
+      const images = parseImages(r.images);
+      const imageUrl = images[0] || null;
+      return {
+        id: r.id,
+        name: r.item_name,
+        item_name: r.item_name,
+        description: r.description || "",
+        price: String(r.price ?? "0"),
+        unit: r.currency || "KD",
+        currency: r.currency || "KD",
+        images,
+        image_url: imageUrl
+      };
+    });
+
+    res.status(200).json({
+      message: "Chalet restaurant items fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet restaurant items",
+      error: error.message
+    });
+  }
+});
+
+// GET /chalets/categories — list active chalet categories (allora_chalet_category)
+router.get("/categories", async (req, res) => {
+  try {
+    const rows = await ChaletCategory.findAll({
+      where: { status: 1 },
+      order: [["id", "ASC"]],
+      raw: true
+    });
+    res.status(200).json({
+      message: "Chalet categories fetched successfully",
+      data: rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet categories",
+      error: error.message
+    });
+  }
+});
+
+// GET /chalets/by-category/:categoryId — list chalets filtered by category_id
+router.get("/by-category/:categoryId", async (req, res) => {
+  try {
+    const categoryId = parseInt(req.params.categoryId, 10);
+    if (isNaN(categoryId)) {
+      return res.status(400).json({ message: "Invalid categoryId" });
+    }
+    const list = await Chalet.findAll({
+      attributes: CHALET_ATTRIBUTES,
+      where: { category_id: categoryId },
+      order: [["created_at", "DESC"], ["id", "DESC"]]
+    });
+    const data = list.map(normalizeChaletListItem).filter(Boolean);
+    res.status(200).json({
+      message: "Chalets by category fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalets by category",
       error: error.message
     });
   }

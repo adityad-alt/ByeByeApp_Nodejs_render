@@ -44,6 +44,10 @@ const BoatProduct = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false
     },
+    images: {
+      type: DataTypes.STRING(500),
+      allowNull: true
+    },
     status: {
       type: DataTypes.ENUM("Active", "Inactive", "Draft"),
       allowNull: false,

@@ -8,6 +8,9 @@ const {
   BoatSpecialPackage,
   BoatProduct,
   BoatAddonRestaurant,
+  BoatAddonRestaurantCategory,
+  BluewaveAddonRestaurant,
+  BluewaveAddMenu,
   BoatProductCategory
 } = require("../models");
 const { Sequelize, Op } = require("sequelize");
@@ -523,9 +526,36 @@ router.get("/products", async (req, res) => {
       raw: true
     });
 
+    const parseImages = (val) => {
+      if (val == null || val === "") return [];
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [val.trim()];
+        } catch (_) {
+          if (String(val).includes(",")) {
+            return String(val).split(",").map((s) => s.trim()).filter(Boolean);
+          }
+          return val.trim() ? [val.trim()] : [];
+        }
+      }
+      return [];
+    };
+
+    const data = rows.map((r) => {
+      const images = parseImages(r.images);
+      const imageUrl = images[0] || null;
+      return {
+        ...r,
+        image: imageUrl,
+        image_url: imageUrl,
+        images
+      };
+    });
+
     res.status(200).json({
       message: "Boat products fetched successfully",
-      data: rows
+      data
     });
   } catch (error) {
     res.status(500).json({
@@ -574,6 +604,149 @@ router.get("/addon-restaurants", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to get boat addon restaurants",
+      error: error.message
+    });
+  }
+});
+
+// Fetch boat addon restaurant categories from bluewave_addon_restaurant_category table
+router.get("/addon-restaurants-category", async (req, res) => {
+  try {
+    const rows = await BoatAddonRestaurantCategory.findAll({
+      order: [["category_name", "ASC"]],
+      raw: true
+    });
+
+    res.status(200).json({
+      message: "Boat addon restaurant categories fetched successfully",
+      data: rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat addon restaurant categories",
+      error: error.message
+    });
+  }
+});
+
+// Fetch boat addon restaurants with category names (join bluewave_addon_restaurants + bluewave_addon_restaurant_category)
+router.get("/addon-restaurants-with-categories", async (req, res) => {
+  try {
+    const restaurants = await BluewaveAddonRestaurant.findAll({
+      order: [["restaurant_name", "ASC"]],
+      raw: true
+    });
+    const categories = await BoatAddonRestaurantCategory.findAll({
+      raw: true
+    });
+
+    const parseJson = (val) => {
+      if (val == null) return val;
+      if (typeof val === "string") {
+        try {
+          return JSON.parse(val);
+        } catch (_) {
+          if (String(val).includes(",")) {
+            return String(val).split(",").map((s) => s.trim()).filter(Boolean);
+          }
+          return val;
+        }
+      }
+      return val;
+    };
+
+    const catByRestaurant = {};
+    for (const c of categories) {
+      const rid = c.restaurant_id;
+      if (rid == null) continue;
+      const key = String(rid);
+      if (!catByRestaurant[key]) catByRestaurant[key] = [];
+      const name = (c.category_name || "").trim();
+      if (name && !catByRestaurant[key].includes(name)) {
+        catByRestaurant[key].push(name);
+      }
+    }
+
+    const data = restaurants.map((r) => {
+      const images = parseJson(r.images);
+      const catList = catByRestaurant[String(r.id)] || [];
+      return {
+        ...r,
+        images: Array.isArray(images) ? images : images,
+        image_url: Array.isArray(images) && images[0] ? images[0] : (r.images || null),
+        categories: catList
+      };
+    });
+
+    res.status(200).json({
+      message: "Boat addon restaurants with categories fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat addon restaurants with categories",
+      error: error.message
+    });
+  }
+});
+
+// Fetch restaurant menu items by restaurant_id (bluewave_add_menu)
+// GET /boats/addon-restaurant-items?restaurant_id=1
+router.get("/addon-restaurant-items", async (req, res) => {
+  try {
+    const { restaurant_id: restaurantId } = req.query;
+
+    if (!restaurantId || String(restaurantId).trim() === "") {
+      return res.status(400).json({
+        message: "restaurant_id query param is required"
+      });
+    }
+
+    const items = await BluewaveAddMenu.findAll({
+      where: { restaurant_id: Number(restaurantId) },
+      order: [["item_name", "ASC"]],
+      raw: true
+    });
+
+    const parseImages = (val) => {
+      if (val == null || val === "") return [];
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          return Array.isArray(parsed) ? parsed : [val.trim()];
+        } catch (_) {
+          if (String(val).includes(",")) {
+            return String(val).split(",").map((s) => s.trim()).filter(Boolean);
+          }
+          return val.trim() ? [val.trim()] : [];
+        }
+      }
+      return [];
+    };
+
+    const data = items.map((r) => {
+      const images = parseImages(r.images);
+      const imageUrl = images[0] || null;
+      return {
+        id: r.id,
+        name: r.item_name,
+        item_name: r.item_name,
+        description: r.description || "",
+        price: String(r.price ?? "0"),
+        unit: r.currency || "KD",
+        currency: r.currency || "KD",
+        images,
+        image_url: imageUrl
+      };
+    });
+
+    res.status(200).json({
+      message: "Restaurant items fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get restaurant items",
       error: error.message
     });
   }

@@ -5,6 +5,51 @@ const sequelize = require("../db");
 const router = express.Router();
 
 /**
+ * GET /escort-service/service-types
+ *
+ * Query params:
+ * - category (string, required)
+ *
+ * Returns all active service types from globalgo_escort_service_type for the given category.
+ */
+router.get("/service-types", async (req, res) => {
+  const { category } = req.query;
+
+  if (!category) {
+    return res.status(400).json({
+      message: "Missing required query parameter: category",
+    });
+  }
+
+  try {
+    const rows = await sequelize.query(
+      `
+        SELECT id, service_type_name, description, image
+        FROM globalgo_escort_service_type
+        WHERE category = ?
+          AND status = 1
+        ORDER BY service_type_name ASC
+      `,
+      {
+        replacements: [category],
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    return res.json({
+      category,
+      service_types: rows,
+    });
+  } catch (error) {
+    console.error("Error fetching escort service types:", error);
+    return res.status(500).json({
+      message: "Failed to fetch service types",
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /escort-service/categories
  *
  * Query params:
@@ -80,40 +125,64 @@ router.get("/categories", async (req, res) => {
 /**
  * GET /escort-service/filter
  *
- * Query params: service_type_name, category, gender, min_price, max_price (all optional)
- * Returns list of escort services matching filters from globalgo_escort_services.
+ * Query params:
+ * - service_type_id (int, preferred) — filters directly on globalgo_escort_services.service_type_id
+ * - category        (string, optional)
+ * - gender          (string, optional)
+ * - min_price       (number, optional)
+ * - max_price       (number, optional)
+ *
+ * Returns matching rows from globalgo_escort_services.
  */
 router.get("/filter", async (req, res) => {
-  const { service_type_name, category, gender, min_price, max_price } = req.query;
+  const { service_type_id, category, gender, min_price, max_price } = req.query;
 
   try {
+    const replacements = [];
+
     let sql = `
       SELECT
-        id, service_type_name, service_type_id, category, title,
-        person_name, person_contact, gender, date_time, guards, price,
-        available, notes, SCHEDULE, hours_per_day, car_model, plate,
-        driver_name, driver_contact, profile_url, extra, STATUS,
-        created_at, updated_at
+        id,
+        service_type_id,
+        category,
+        title,
+        person_name,
+        person_contact,
+        gender,
+        date_time,
+        guards,
+        price,
+        available,
+        notes,
+        SCHEDULE,
+        hours_per_day,
+        car_model,
+        plate,
+        driver_name,
+        driver_contact,
+        profile_url,
+        extra,
+        STATUS,
+        created_at,
+        updated_at
       FROM globalgo_escort_services
       WHERE STATUS = 1
     `;
-    const replacements = [];
-    let idx = 1;
 
-    if (service_type_name && String(service_type_name).trim()) {
-      sql += ` AND service_type_name = ?`;
-      replacements.push(String(service_type_name).trim());
-      idx++;
+    if (service_type_id != null && service_type_id !== "") {
+      const id = parseInt(String(service_type_id), 10);
+      if (!isNaN(id)) {
+        sql += ` AND service_type_id = ?`;
+        replacements.push(id);
+      }
     }
     if (category && String(category).trim()) {
       sql += ` AND category = ?`;
       replacements.push(String(category).trim());
-      idx++;
     }
     if (gender && String(gender).trim()) {
       sql += ` AND gender = ?`;
       replacements.push(String(gender).trim());
-      idx++;
     }
     if (min_price != null && min_price !== "") {
       const n = parseFloat(String(min_price));
