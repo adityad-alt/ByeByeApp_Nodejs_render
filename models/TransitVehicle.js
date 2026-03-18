@@ -60,6 +60,11 @@ const TransitVehicle = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true
     },
+    cover_image: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: "Single cover image URL for listing display"
+    },
     lat: {
       type: DataTypes.DECIMAL(10, 7),
       allowNull: true

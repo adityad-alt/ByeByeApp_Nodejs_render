@@ -87,7 +87,12 @@ function applyFormattedJets(item) {
   if (!item || typeof item !== "object") return item;
   const ph = formatJetPrice(item.price_per_hour);
   const pt = formatJetPrice(item.price_per_trip);
-  return { ...item, price_per_hour: ph ?? pt, price_per_trip: pt ?? ph };
+  return {
+    ...item,
+    price_per_hour: ph ?? pt,
+    price_per_trip: pt ?? ph,
+    cover_image: item.cover_image ?? null
+  };
 }
 
 // GET /jets/filter - Filter jets by jet_type, manufacturer, model, departure, destination,
@@ -226,13 +231,13 @@ router.get("/", async (req, res) => {
 
     if (id) {
       const jet = await Jet.findOne({
-        where: { id: Number(id) || id }
+        where: { id: Number(id) || id },
+        raw: true
       });
       if (!jet) {
         return res.status(404).json({ message: "Jet not found" });
       }
-      const plain = jet.get ? jet.get({ plain: true }) : jet;
-      const data = applyFormattedJets(plain);
+      const data = applyFormattedJets(jet);
       return res.status(200).json({
         message: "Jet fetched successfully",
         data

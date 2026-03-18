@@ -67,12 +67,11 @@ router.get("/list", async (req, res) => {
       order: [
         ["created_at", "DESC"],
         ["id", "DESC"]
-      ]
+      ],
+      raw: true
     });
 
-    const rows = vehicles.map((v) => (v.get ? v.get({ plain: true }) : v));
-
-    let data = rows;
+    let data = vehicles;
 
     const hasUserLocation =
       userLat != null && userLat !== "" && userLong != null && userLong !== "";
@@ -86,7 +85,7 @@ router.get("/list", async (req, res) => {
       const userLongNum = Number(userLong);
 
       if (!Number.isNaN(userLatNum) && !Number.isNaN(userLongNum)) {
-        data = rows
+        data = data
           .map((item) => {
             const vLat = item.lat;
             const vLong = item.long;
@@ -139,7 +138,13 @@ function applyFormattedPrices(item) {
   const curr = item.currency || "KWD";
   const ph = formatTransitPrice(item.price_per_hour);
   const pd = formatTransitPrice(item.price_per_day);
-  return { ...item, price_per_hour: ph ?? pd, price_per_day: pd ?? ph, currency: curr };
+  return {
+    ...item,
+    price_per_hour: ph ?? pd,
+    price_per_day: pd ?? ph,
+    currency: curr,
+    cover_image: item.cover_image ?? null
+  };
 }
 
 // GET /transit-car-rent/filter - Filter vehicles by brand, model, fuel_type, price, seat_capacity, location
