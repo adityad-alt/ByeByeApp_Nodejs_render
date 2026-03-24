@@ -317,4 +317,73 @@ router.get("/persons", async (req, res) => {
   }
 });
 
+/**
+ * GET /escort-service/person/:id
+ *
+ * Returns a single person/service row by id from globalgo_escort_services.
+ */
+router.get("/person/:id", async (req, res) => {
+  const id = parseInt(String(req.params.id), 10);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({
+      message: "Invalid person id",
+    });
+  }
+
+  try {
+    const rows = await sequelize.query(
+      `
+        SELECT
+          id,
+          service_type_id,
+          category,
+          title,
+          person_name,
+          person_contact,
+          gender,
+          date_time,
+          guards,
+          price,
+          available,
+          notes,
+          SCHEDULE,
+          hours_per_day,
+          car_model,
+          plate,
+          driver_name,
+          driver_contact,
+          profile_url,
+          extra,
+          STATUS,
+          created_at,
+          updated_at
+        FROM globalgo_escort_services
+        WHERE id = ?
+        LIMIT 1
+      `,
+      {
+        replacements: [id],
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({
+        message: "Person not found",
+      });
+    }
+
+    return res.json({
+      message: "Person fetched successfully",
+      data: rows[0],
+    });
+  } catch (error) {
+    console.error("Error fetching escort-service person by id:", error);
+    return res.status(500).json({
+      message: "Failed to fetch person",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

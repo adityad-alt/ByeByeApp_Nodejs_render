@@ -41,6 +41,11 @@ const EscortBooking = sequelize.define(
       allowNull: true,
       comment: "Bodyguards, Escort, Babysitter, etc."
     },
+    person_id: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+      comment: "Selected escort person/service id from globalgo_escort_services"
+    },
     request_date: {
       type: DataTypes.DATEONLY,
       allowNull: true

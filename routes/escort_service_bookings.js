@@ -1,9 +1,70 @@
 const express = require("express");
 const { EscortBooking } = require("../models");
+const { QueryTypes } = require("sequelize");
+const sequelize = require("../db");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
 
 const router = express.Router();
+
+async function attachPersonDetails(records) {
+  const list = Array.isArray(records) ? records : [records];
+  const personIds = [...new Set(
+    list
+      .map((r) => (r?.person_id != null ? Number(r.person_id) : null))
+      .filter((id) => Number.isFinite(id) && id > 0)
+  )];
+
+  if (!personIds.length) {
+    return Array.isArray(records)
+      ? list
+      : (list[0] || null);
+  }
+
+  const placeholders = personIds.map(() => "?").join(",");
+  const rows = await sequelize.query(
+    `
+      SELECT
+        id,
+        service_type_id,
+        category,
+        title,
+        person_name,
+        person_contact,
+        gender,
+        date_time,
+        guards,
+        price,
+        available,
+        notes,
+        SCHEDULE,
+        hours_per_day,
+        car_model,
+        plate,
+        driver_name,
+        driver_contact,
+        profile_url,
+        extra,
+        STATUS,
+        created_at,
+        updated_at
+      FROM globalgo_escort_services
+      WHERE id IN (${placeholders})
+    `,
+    {
+      replacements: personIds,
+      type: QueryTypes.SELECT
+    }
+  );
+
+  const personMap = new Map(rows.map((row) => [Number(row.id), row]));
+  const enriched = list.map((row) => ({
+    ...row,
+    person_details: row?.person_id ? (personMap.get(Number(row.person_id)) || null) : null
+  }));
+
+  return Array.isArray(records) ? enriched : (enriched[0] || null);
+}
 
 function parseDateDMY(str) {
   if (!str || typeof str !== "string") return null;
@@ -32,19 +93,27 @@ function parseTime(str) {
 // GET /my-bookings - auth required, returns current user's bookings
 router.get("/", async (req, res) => {
   try {
-    const { id, user_id } = req.query;
+    const { id, booking_id, user_id } = req.query;
 
-    if (id) {
+    if (id || booking_id) {
+      const where = {};
+      if (id) {
+        where.id = Number(id) || id;
+      }
+      if (booking_id) {
+        where.booking_id = String(booking_id);
+      }
       const booking = await EscortBooking.findOne({
-        where: { id: Number(id) || id }
+        where
       });
       if (!booking) {
         return res.status(404).json({ message: "Escort booking not found" });
       }
       const data = booking.get ? booking.get({ plain: true }) : booking;
+      const enriched = await attachPersonDetails(data);
       return res.status(200).json({
         message: "Escort booking fetched successfully",
-        data
+        data: enriched
       });
     }
 
@@ -58,10 +127,11 @@ router.get("/", async (req, res) => {
       order: [["created_at", "DESC"]],
       raw: true
     });
+    const enriched = await attachPersonDetails(bookings);
 
     res.status(200).json({
       message: "Escort bookings list fetched successfully",
-      data: bookings
+      data: enriched
     });
   } catch (error) {
     res.status(500).json({
@@ -84,10 +154,11 @@ router.get("/my-bookings", auth, async (req, res) => {
       order: [["created_at", "DESC"]],
       raw: true
     });
+    const enriched = await attachPersonDetails(bookings);
 
     res.status(200).json({
       message: "My escort bookings fetched successfully",
-      data: bookings
+      data: enriched
     });
   } catch (error) {
     res.status(500).json({
@@ -107,6 +178,7 @@ router.post("/", optionalAuth, async (req, res) => {
       email_id,
       escort_service_type,
       vip_service_type,
+      person_id,
       request_date,
       request_time,
       start_date,
@@ -130,6 +202,31 @@ router.post("/", optionalAuth, async (req, res) => {
     const endDateStr = end_date ? parseDateDMY(end_date) || end_date : null;
     const startTimeStr = start_time ? parseTime(start_time) || start_time : null;
     const endTimeStr = end_time ? parseTime(end_time) || end_time : null;
+    const personId = person_id != null && person_id !== "" ? Number(person_id) : null;
+    if (personId != null && (!Number.isFinite(personId) || personId <= 0)) {
+      return res.status(400).json({
+        message: "Invalid person_id"
+      });
+    }
+    if (personId != null) {
+      const personRows = await sequelize.query(
+        `
+          SELECT id
+          FROM globalgo_escort_services
+          WHERE id = ?
+          LIMIT 1
+        `,
+        {
+          replacements: [personId],
+          type: QueryTypes.SELECT
+        }
+      );
+      if (!personRows.length) {
+        return res.status(404).json({
+          message: "Selected person not found"
+        });
+      }
+    }
     const bookingId = `ESC-${Date.now()}`;
 
     const booking = await EscortBooking.create({
@@ -140,6 +237,7 @@ router.post("/", optionalAuth, async (req, res) => {
       email_id: email_id || null,
       escort_service_type: escort_service_type || null,
       vip_service_type: vip_service_type || null,
+      person_id: personId,
       request_date: reqDateStr,
       request_time: reqTimeStr,
       start_date: startDateStr,
