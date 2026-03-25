@@ -103,6 +103,8 @@ app.use("/shop", shopRoutes);
 app.use("/notifications", notificationsRoutes);
 app.use("/app-policies", appPolicyRoutes);
 app.use("/about-us", aboutUsRoutes);
+const couponRoutes = require("./routes/coupon");
+app.use("/coupon", couponRoutes);
 
 const startServer = async () => {
   try {
