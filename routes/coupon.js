@@ -84,7 +84,6 @@ router.post("/check", async (req, res) => {
           AND status = 1
           AND (start_date IS NULL OR start_date <= :now)
           AND (end_date IS NULL OR end_date >= :now)
-        FOR UPDATE
         `,
         {
           replacements: {
@@ -124,7 +123,7 @@ router.post("/check", async (req, res) => {
         return {
           available: false,
           message:
-            "Order total must be greater than minimum order amount",
+            "This coupon requires a minimum order amount of " + minimumOrderAmount + " KWD",
           minimum_order_amount: minimumOrderAmount,
           order_total: orderTotal
         };
@@ -156,18 +155,197 @@ router.post("/check", async (req, res) => {
         }
       }
 
-      await sequelize.query(
+      return {
+        available: true,
+        message: "Coupon applied successfully",
+        data: {
+          coupon_id: couponIdNum,
+          coupon_code: c.coupon_code ?? couponCode,
+          discount_type: c.discount_type ?? null,
+          discount_value: c.discount_value ?? null,
+          discount_amount: discountAmount
+        }
+      };
+    });
+
+    if (!result.available) {
+      return res.status(200).json({
+        message: result.message || "Coupon not available"
+      });
+    }
+
+    return res.status(200).json({
+      message: result.message,
+      data: { ...result.data, available: true }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to validate coupon",
+      error: error.message
+    });
+  }
+});
+
+router.post("/after-payment", async (req, res) => {
+  try {
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ message: "Authorization token required" });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    const couponCodeRaw = req.body?.coupon_code ?? req.query?.coupon_code;
+    const couponCode =
+      typeof couponCodeRaw === "string" ? couponCodeRaw.trim() : "";
+    if (!couponCode) {
+      return res.status(400).json({ message: "coupon_code is required" });
+    }
+
+    const orderIdRaw = req.body?.order_id ?? req.query?.order_id;
+    if (orderIdRaw == null || orderIdRaw === "") {
+      return res.status(400).json({ message: "order_id is required" });
+    }
+    const orderId = Number(orderIdRaw);
+    if (!Number.isFinite(orderId)) {
+      return res.status(400).json({ message: "order_id must be a valid number" });
+    }
+
+    const orderTotal =
+      parseMaybeNumber(req.body?.order_total) ??
+      parseMaybeNumber(req.body?.total_amount) ??
+      parseMaybeNumber(req.body?.total_amount) ??
+      parseMaybeNumber(req.body?.total) ??
+      parseMaybeNumber(req.body?.order_amount);
+    if (orderTotal == null || !Number.isFinite(orderTotal) || orderTotal <= 0) {
+      return res.status(400).json({ message: "order_total must be provided and > 0" });
+    }
+
+    const result = await sequelize.transaction(async (t) => {
+      const couponRows = await sequelize.query(
         `
-        UPDATE coupons
-        SET used_count = used_count + 1,
-            updated_at = NOW()
-        WHERE id = :id
+        SELECT
+          id,
+          coupon_code,
+          discount_type,
+          discount_value,
+          minimum_order_amount,
+          maximum_discount_amount,
+          usage_limit,
+          used_count,
+          start_date,
+          end_date,
+          status
+        FROM coupons
+        WHERE coupon_code = :coupon_code
+          AND status = 1
+          AND (start_date IS NULL OR start_date <= :now)
+          AND (end_date IS NULL OR end_date >= :now)
+        FOR UPDATE
         `,
         {
-          replacements: { id: couponIdNum },
+          replacements: {
+            coupon_code: couponCode,
+            now: new Date(),
+          },
+          type: sequelize.QueryTypes.SELECT,
           transaction: t
         }
       );
+
+      if (!Array.isArray(couponRows) || couponRows.length === 0) {
+        return { available: false, message: "Coupon not available" };
+      }
+
+      const c = couponRows[0];
+      const couponIdNum = Number(c.id);
+      if (!Number.isFinite(couponIdNum)) {
+        return { available: false, message: "Coupon not available" };
+      }
+
+      const usedCount = Number(c.used_count ?? 0);
+      const usageLimit =
+        c.usage_limit == null || c.usage_limit === "" ? null : Number(c.usage_limit);
+
+      if (usageLimit != null && Number.isFinite(usageLimit) && usedCount >= usageLimit) {
+        return { available: false, message: "Coupon not available" };
+      }
+
+      const minimumOrderAmount = Number(c.minimum_order_amount ?? 0);
+      if (orderTotal < minimumOrderAmount) {
+        return {
+          available: false,
+          message:
+            "This coupon requires a minimum order amount of " + minimumOrderAmount + " KWD",
+          minimum_order_amount: minimumOrderAmount,
+          order_total: orderTotal
+        };
+      }
+
+      const existingUsedRows = await sequelize.query(
+        `
+        SELECT id, discount_amount
+        FROM used_coupons
+        WHERE order_id = :order_id
+          AND coupon_id = :coupon_id
+          AND user_id = :user_id
+        LIMIT 1
+        `,
+        {
+          replacements: {
+            order_id: orderId,
+            coupon_id: couponIdNum,
+            user_id: Number(userId),
+          },
+          type: sequelize.QueryTypes.SELECT,
+          transaction: t
+        }
+      );
+
+      if (Array.isArray(existingUsedRows) && existingUsedRows.length > 0) {
+        const existing = existingUsedRows[0];
+        return {
+          available: true,
+          message: "Coupon usage already recorded",
+          data: {
+            coupon_id: couponIdNum,
+            coupon_code: c.coupon_code ?? couponCode,
+            discount_type: c.discount_type ?? null,
+            discount_value: c.discount_value ?? null,
+            discount_amount: Number(existing.discount_amount ?? 0),
+          }
+        };
+      }
+
+      let discountAmount = 0;
+      if (orderTotal != null && Number.isFinite(orderTotal) && orderTotal > 0) {
+        const discountType = String(c.discount_type || "fixed");
+        const discountValue = Number(c.discount_value ?? 0);
+        const maximumDiscountAmount =
+          c.maximum_discount_amount == null || c.maximum_discount_amount === ""
+            ? null
+            : Number(c.maximum_discount_amount);
+
+        if (orderTotal >= minimumOrderAmount) {
+          if (discountType === "percentage") {
+            discountAmount = (orderTotal * discountValue) / 100;
+          } else {
+            // fixed
+            discountAmount = discountValue;
+          }
+
+          if (maximumDiscountAmount != null && Number.isFinite(maximumDiscountAmount)) {
+            discountAmount = Math.min(discountAmount, maximumDiscountAmount);
+          }
+
+          discountAmount = Math.min(discountAmount, orderTotal);
+          discountAmount = Math.max(0, discountAmount);
+        }
+      }
 
       await sequelize.query(
         `
@@ -204,9 +382,22 @@ router.post("/check", async (req, res) => {
         }
       );
 
+      await sequelize.query(
+        `
+        UPDATE coupons
+        SET used_count = used_count + 1,
+            updated_at = NOW()
+        WHERE id = :id
+        `,
+        {
+          replacements: { id: couponIdNum },
+          transaction: t
+        }
+      );
+
       return {
         available: true,
-        message: "Coupon applied successfully",
+        message: "Coupon usage recorded successfully",
         data: {
           coupon_id: couponIdNum,
           coupon_code: c.coupon_code ?? couponCode,
@@ -229,7 +420,7 @@ router.post("/check", async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
-      message: "Failed to validate coupon",
+      message: "Failed to confirm coupon usage",
       error: error.message
     });
   }
