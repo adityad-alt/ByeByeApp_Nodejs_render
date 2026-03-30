@@ -32,6 +32,7 @@ const shopRoutes = require("./routes/shop");
 const notificationsRoutes = require("./routes/notifications");
 const appPolicyRoutes = require("./routes/app_policy");
 const aboutUsRoutes = require("./routes/about_us");
+const splashscreenRoutes = require("./routes/splashscreen");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -103,6 +104,7 @@ app.use("/shop", shopRoutes);
 app.use("/notifications", notificationsRoutes);
 app.use("/app-policies", appPolicyRoutes);
 app.use("/about-us", aboutUsRoutes);
+app.use("/splashscreen", splashscreenRoutes);
 const couponRoutes = require("./routes/coupon");
 app.use("/coupon", couponRoutes);
 

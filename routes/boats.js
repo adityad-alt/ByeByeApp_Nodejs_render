@@ -55,11 +55,13 @@ function normalizeBoat(boat) {
   };
   const galleryImages = parseImagesFromString(primaryImgRaw).filter(Boolean);
   const primaryImg = galleryImages[0] ?? "";
+  const videoUrl = (row.video ?? "").toString().trim();
   return {
     ...row,
     name: row.boat_name ?? row.name ?? "",
     image_url: primaryImg,
     gallery_images: galleryImages,
+    video: videoUrl,
     amenities: amenitiesList,
     facilities: amenitiesList
   };
@@ -358,6 +360,7 @@ router.post("/add-boat", async (req, res) => {
       price_per_day,
       price_per_day_currency,
       primary_image_url,
+      video,
       lat,
       long,
       length_meters,
@@ -378,6 +381,7 @@ router.post("/add-boat", async (req, res) => {
       price_per_day,
       price_per_day_currency,
       primary_image_url,
+      video,
       lat,
       long,
       length_meters,
@@ -405,6 +409,7 @@ router.put("/update-boat/:id", async (req, res) => {
       price_per_day,
       price_per_day_currency,
       primary_image_url,
+      video,
       lat,
       long,
       length_meters,
@@ -426,6 +431,7 @@ router.put("/update-boat/:id", async (req, res) => {
         price_per_day,
         price_per_day_currency,
         primary_image_url,
+        video,
         lat,
         long,
         length_meters,

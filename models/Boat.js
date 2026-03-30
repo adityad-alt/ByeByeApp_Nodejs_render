@@ -52,6 +52,10 @@ const Boat = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true
     },
+    video: {
+      type: DataTypes.STRING(500),
+      allowNull: true
+    },
     lat: {
       type: DataTypes.DECIMAL(10, 8),
       allowNull: true

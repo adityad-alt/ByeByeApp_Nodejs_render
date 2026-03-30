@@ -232,6 +232,109 @@ router.get("/boats", auth, async (req, res) => {
   }
 });
 
+// PUT /user-details/boats/:id - Update a user's boat
+router.put("/boats/:id", auth, async (req, res) => {
+  try {
+    const userId = req.user?.id ?? req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        message: "User not authenticated"
+      });
+    }
+
+    const normalizeJsonField = (val) => {
+      // When a field is provided as an array (from Flutter), store as JSON string.
+      if (Array.isArray(val)) return JSON.stringify(val);
+      if (typeof val === "string") return val;
+      if (val === null) return null;
+      return null;
+    };
+
+    const {
+      boat_name,
+      height,
+      width,
+      length,
+      boat_type,
+      civil_id_image,
+      license_image,
+      additional_images,
+      additional_videos
+    } = req.body;
+
+    // Only update fields that are actually present in the request body.
+    // (Flutter omits keys when values are null/empty.)
+    const updates = {};
+    if (boat_name !== undefined) updates.boat_name = boat_name || null;
+    if (height !== undefined) updates.height = height || null;
+    if (width !== undefined) updates.width = width || null;
+    if (length !== undefined) updates.length = length || null;
+    if (boat_type !== undefined) updates.boat_type = boat_type || null;
+    if (civil_id_image !== undefined)
+      updates.civil_id_image = civil_id_image || null;
+    if (license_image !== undefined)
+      updates.license_image = license_image || null;
+    if (additional_images !== undefined)
+      updates.additional_images = normalizeJsonField(additional_images);
+    if (additional_videos !== undefined)
+      updates.additional_videos = normalizeJsonField(additional_videos);
+
+    const id = Number(req.params.id);
+
+    const [rowsUpdated] = await AppUserBoat.update(updates, {
+      where: { id, user_id: userId }
+    });
+
+    if (!rowsUpdated) {
+      return res.status(404).json({ message: "Boat not found" });
+    }
+
+    const updatedBoat = await AppUserBoat.findOne({
+      where: { id, user_id: userId },
+      raw: true
+    });
+
+    return res.status(200).json({
+      message: "Boat updated successfully",
+      data: updatedBoat
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to update boat",
+      error: error.message
+    });
+  }
+});
+
+// DELETE /user-details/boats/:id - Delete a user's boat
+router.delete("/boats/:id", auth, async (req, res) => {
+  try {
+    const userId = req.user?.id ?? req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        message: "User not authenticated"
+      });
+    }
+
+    const id = Number(req.params.id);
+
+    const rowsDeleted = await AppUserBoat.destroy({
+      where: { id, user_id: userId }
+    });
+
+    if (!rowsDeleted) {
+      return res.status(404).json({ message: "Boat not found" });
+    }
+
+    return res.status(200).json({ message: "Boat deleted" });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to delete boat",
+      error: error.message
+    });
+  }
+});
+
 // POST /user-details/addresses - Add user address
 router.post("/addresses", auth, async (req, res) => {
   try {
