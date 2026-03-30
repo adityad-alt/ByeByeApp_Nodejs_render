@@ -54,6 +54,7 @@ const BoatDestination = require("./BoatDestination");
 const BluewavePolicy = require("./BluewavePolicy");
 const BYEFeedback = require("./BYEFeedback");
 const AboutUs = require("./AboutUs");
+const GlobalgoTripVehicle = require("./GlobalgoTripVehicle");
 
 // Shop order associations
 ShopOrder.hasMany(ShopOrderItem, { foreignKey: "order_id", as: "ShopOrderItems" });
@@ -115,5 +116,6 @@ module.exports = {
   ChaletCategory,
   BluewavePolicy,
   BYEFeedback,
-  AboutUs
+  AboutUs,
+  GlobalgoTripVehicle
 };

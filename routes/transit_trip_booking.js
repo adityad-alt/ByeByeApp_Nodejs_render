@@ -1,5 +1,7 @@
 const express = require("express");
-const { TransitTripBooking } = require("../models");
+const { TransitTripBooking, GlobalgoTripVehicle } = require("../models");
+const sequelize = require("../db");
+const { QueryTypes } = require("sequelize");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
 
@@ -129,6 +131,82 @@ router.post("/booking", optionalAuth, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to create trip booking",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /transit-trip-booking/nearby-vehicles
+ * Fetch available trip vehicles near a pickup location using Haversine formula.
+ *
+ * Query params:
+ *   lat      (required) – pickup latitude
+ *   long     (required) – pickup longitude
+ *   radius   (optional) – search radius in km (default: 10)
+ *
+ * Filters:
+ *   - is_available = 1
+ *   - inventory_numbers is not null, not empty, and numeric value > 0
+ *   - vehicle lat/long must be set
+ *
+ * Returns vehicles sorted by distance (nearest first) with distance_km field.
+ */
+router.get("/nearby-vehicles", async (req, res) => {
+  try {
+    const userLat = parseFloat(req.query.lat);
+    const userLong = parseFloat(req.query.long);
+    const radius = parseFloat(req.query.radius) || 10;
+
+    if (isNaN(userLat) || isNaN(userLong)) {
+      return res.status(400).json({
+        message: "Missing or invalid query params: lat and long are required"
+      });
+    }
+
+    if (radius <= 0 || radius > 500) {
+      return res.status(400).json({
+        message: "radius must be between 1 and 500 km"
+      });
+    }
+
+    // Haversine formula in SQL (Earth radius = 6371 km)
+    const vehicles = await sequelize.query(
+      `SELECT *,
+        (6371 * ACOS(
+          LEAST(1.0, COS(RADIANS(:userLat))
+            * COS(RADIANS(lat))
+            * COS(RADIANS(\`long\`) - RADIANS(:userLong))
+            + SIN(RADIANS(:userLat))
+            * SIN(RADIANS(lat))
+          )
+        )) AS distance_km
+       FROM globalgo_trip_vehicles
+       WHERE is_available = 1
+         AND lat IS NOT NULL
+         AND \`long\` IS NOT NULL
+         AND inventory_numbers IS NOT NULL
+         AND TRIM(inventory_numbers) != ''
+         AND CAST(inventory_numbers AS DECIMAL) > 0
+       HAVING distance_km <= :radius
+       ORDER BY distance_km ASC`,
+      {
+        replacements: { userLat, userLong, radius },
+        type: QueryTypes.SELECT
+      }
+    );
+
+    res.status(200).json({
+      message: "Nearby trip vehicles fetched successfully",
+      pickup_lat: userLat,
+      pickup_long: userLong,
+      radius_km: radius,
+      total: vehicles.length,
+      data: vehicles
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch nearby trip vehicles",
       error: error.message
     });
   }
