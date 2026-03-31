@@ -35,16 +35,20 @@ const aboutUsRoutes = require("./routes/about_us");
 const splashscreenRoutes = require("./routes/splashscreen");
 const app = express();
 const PORT = process.env.PORT || 3000;
+const favouriteRoutes = require("./routes/user_favourite");
 
-app.use(cors());
+
+// Parse JSON and URL‑encoded bodies so req.body is available
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Handle invalid JSON body (e.g. client sends "POST /api/..." or plain text as body)
+// Handle invalid JSON body (e.g. client sends plain text instead of JSON)
 app.use((err, req, res, next) => {
   if (err.status === 400 && err.type === "entity.parse.failed") {
     return res.status(400).json({
       message: "Invalid JSON in request body",
-      hint: "Send a valid JSON object. Example: { \"name\": \"Service\", \"price\": 99.99 }"
+      hint:
+        'Send a valid JSON object. Example: { "item_id": 123, "item_type": "Packages" }',
     });
   }
   next(err);
@@ -107,6 +111,7 @@ app.use("/about-us", aboutUsRoutes);
 app.use("/splashscreen", splashscreenRoutes);
 const couponRoutes = require("./routes/coupon");
 app.use("/coupon", couponRoutes);
+app.use("/user-favourite", favouriteRoutes);
 
 const startServer = async () => {
   try {

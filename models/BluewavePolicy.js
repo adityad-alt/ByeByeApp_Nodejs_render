@@ -10,7 +10,13 @@ const BluewavePolicy = sequelize.define(
       primaryKey: true
     },
     policy_type: {
-      type: DataTypes.ENUM("refund", "terms", "privacy"),
+      // Previously ENUM("refund", "terms", "privacy").
+      // Now a free-text string so we can support:
+      // - "boat booking"
+      // - "Parking"
+      // - "Seafarer"
+      // as well as existing types used elsewhere.
+      type: DataTypes.STRING(100),
       allowNull: false
     },
     title: {

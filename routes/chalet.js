@@ -577,6 +577,37 @@ router.get("/special-packages", async (req, res) => {
   }
 });
 
+// Fetch single chalet special package by ID
+// GET /chalets/special-packages/:id
+router.get("/special-packages/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: "Invalid package id" });
+    }
+
+    const row = await ChaletSpecialPackage.findByPk(id, { raw: true });
+    if (!row) {
+      return res.status(404).json({ message: "Chalet special package not found" });
+    }
+
+    const data = {
+      ...row,
+      package_images: row.package_images || null
+    };
+
+    res.status(200).json({
+      message: "Chalet special package fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet special package",
+      error: error.message
+    });
+  }
+});
+
 // Fetch chalet addon restaurants from allora_chalet_addon_restaurants table
 router.get("/addon-restaurants", async (req, res) => {
   try {

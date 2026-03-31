@@ -93,4 +93,30 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get single boat parking place by ID
+// GET /boat-parking/:id
+router.get("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: "Invalid parking id" });
+    }
+
+    const row = await BoatParking.findByPk(id, { raw: true });
+    if (!row) {
+      return res.status(404).json({ message: "Boat parking not found" });
+    }
+
+    res.status(200).json({
+      message: "Boat parking fetched successfully",
+      data: row
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat parking details",
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

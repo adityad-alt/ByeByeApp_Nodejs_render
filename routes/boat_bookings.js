@@ -370,12 +370,17 @@ router.get("/get-bookings", auth, async (req, res) => {
 });
 
 // Get active boat booking policy (bluewave_policies)
-// GET /boat-bookings/policy?policy_type=terms|refund|privacy
+// GET /boat-bookings/policy?policy_type=boat booking|Parking|Seafarer
 router.get("/policy", async (req, res) => {
   try {
-    const allowedTypes = new Set(["refund", "terms", "privacy"]);
-    const typeFromQuery = String(req.query.policy_type || "").toLowerCase();
-    const policyType = allowedTypes.has(typeFromQuery) ? typeFromQuery : "terms";
+    // Accept explicit policy types from the DB:
+    // e.g. "boat booking", "Parking", "Seafarer".
+    // Default to "boat booking" when not provided.
+    const rawType = req.query.policy_type;
+    const policyType =
+      typeof rawType === "string" && rawType.trim() !== ""
+        ? rawType.trim()
+        : "boat booking";
 
     const policy = await BluewavePolicy.findOne({
       where: { policy_type: policyType, status: 1 },

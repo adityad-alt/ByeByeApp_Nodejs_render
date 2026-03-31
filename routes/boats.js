@@ -511,6 +511,37 @@ router.get("/special-packages", async (req, res) => {
   }
 });
 
+// Fetch single boat special package by ID
+// GET /boats/special-packages/:id
+router.get("/special-packages/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: "Invalid package id" });
+    }
+
+    const row = await BoatSpecialPackage.findByPk(id, { raw: true });
+    if (!row) {
+      return res.status(404).json({ message: "Boat special package not found" });
+    }
+
+    const data = {
+      ...row,
+      package_images: row.package_images || null
+    };
+
+    res.status(200).json({
+      message: "Boat special package fetched successfully",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get boat special package",
+      error: error.message
+    });
+  }
+});
+
 // Fetch boat products from boat_products table (optional query: status=Active|Inactive|Draft, category, sub_category)
 router.get("/products", async (req, res) => {
   try {
