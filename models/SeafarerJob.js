@@ -5,28 +5,28 @@ const SeafarerJob = sequelize.define(
   "SeafarerJob",
   {
     id: {
-      type: DataTypes.BIGINT,
+      type: DataTypes.BIGINT.UNSIGNED,
       autoIncrement: true,
       primaryKey: true
     },
     full_name: {
       type: DataTypes.STRING(150),
-      allowNull: true
+      allowNull: false
     },
     license_number: {
       type: DataTypes.STRING(100),
-      allowNull: true
+      allowNull: false
     },
     email: {
       type: DataTypes.STRING(150),
-      allowNull: true
+      allowNull: false
     },
     phone: {
       type: DataTypes.STRING(30),
-      allowNull: true
+      allowNull: false
     },
     specialty: {
-      type: DataTypes.STRING(255),
+      type: DataTypes.STRING(150),
       allowNull: true
     },
     experience_years: {
@@ -37,14 +37,27 @@ const SeafarerJob = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true
     },
-    STATUS: {
-      type: DataTypes.ENUM("pending", "active", "inactive"),
-      allowNull: true,
+    profile_photo_name: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    profile_photo_path: {
+      type: DataTypes.STRING(500),
+      allowNull: true
+    },
+    document_images: {
+      type: DataTypes.JSON,
+      allowNull: true
+    },
+    status: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
       defaultValue: "pending"
     },
     created_at: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true,
+      defaultValue: sequelize.literal("CURRENT_TIMESTAMP")
     },
     updated_at: {
       type: DataTypes.DATE,
@@ -52,7 +65,7 @@ const SeafarerJob = sequelize.define(
     }
   },
   {
-    tableName: "bluewave_seafare_jobs",
+    tableName: "bluewave_seafarer_jobs",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at"
