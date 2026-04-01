@@ -56,7 +56,7 @@ const ChaletBooking = sequelize.define(
     }
   },
   {
-    tableName: "chalet_bookings",
+    tableName: "allora_chalet_bookings",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: false

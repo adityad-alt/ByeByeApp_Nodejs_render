@@ -2,12 +2,14 @@ const express = require("express");
 const {
   Chalet,
   ChaletBooking,
+  ChaletReview,
   ChaletAddonItem,
   ChaletSpecialPackage,
   ChaletAddonRestaurant,
   ChaletAddonRestaurantCategory,
   ChaletAddMenu,
-  ChaletCategory
+  ChaletCategory,
+  ChaletSubCategory
 } = require("../models");
 const auth = require("../middleware/auth");
 const optionalAuth = auth.optionalAuth;
@@ -16,7 +18,17 @@ const { Op } = require("sequelize");
 
 // GET /chalets — health check for chalet API
 router.get("/", (req, res) => {
-  res.json({ message: "Chalets API", routes: ["GET /chalets/list", "GET /chalets/chalet-details/:id", "POST /chalets/booking", "GET /chalets/my-bookings"] });
+  res.json({
+    message: "Chalets API",
+    routes: [
+      "GET /chalets/list",
+      "GET /chalets/chalet-details/:id",
+      "POST /chalets/booking",
+      "GET /chalets/my-bookings",
+      "POST /chalets/reviews",
+      "GET /chalets/:chaletId/reviews"
+    ]
+  });
 });
 
 // Exclude rate_night and price_per_day from API responses
@@ -294,7 +306,7 @@ router.get("/filter-chalets", async (req, res) => {
   }
 });
 
-// ——— Chalet Bookings (table: chalet_bookings) ———
+// ——— Chalet Bookings (table: allora_chalet_bookings) ———
 
 // GET /chalets/my-bookings — get current user's chalet bookings (auth required)
 router.get("/my-bookings", auth, async (req, res) => {
@@ -311,7 +323,7 @@ router.get("/my-bookings", auth, async (req, res) => {
     res.status(200).json({
       message: "My chalet bookings fetched successfully",
       customer_id,
-      table_name: ChaletBooking.tableName || "chalet_bookings",
+      table_name: ChaletBooking.tableName || "allora_chalet_bookings",
       data
     });
   } catch (error) {
@@ -437,12 +449,133 @@ router.post("/booking", optionalAuth, async (req, res) => {
     res.status(201).json({
       message: "Chalet booking created successfully",
       customer_id: customerId,
-      table_name: ChaletBooking.tableName || "chalet_bookings",
+      table_name: ChaletBooking.tableName || "allora_chalet_bookings",
       data: { id: data.id, chalet_id: data.chalet_id, ...data }
     });
   } catch (error) {
     res.status(500).json({
       message: "Failed to create chalet booking",
+      error: error.message
+    });
+  }
+});
+
+// ——— Chalet Reviews & Ratings (table: globalgo_chalet_review) ———
+//
+// POST /chalets/reviews (auth required)
+// Body: { chalet_id, rating (1..5), review? }
+// Uses token to set customer_id (req.user.id)
+router.post("/reviews", auth, async (req, res) => {
+  try {
+    const customer_id = req.user?.id;
+    if (customer_id == null) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    const { chalet_id, rating, review } = req.body || {};
+
+    const chaletId =
+      chalet_id != null && String(chalet_id).trim() !== ""
+        ? Number(chalet_id)
+        : null;
+    if (chaletId == null || Number.isNaN(chaletId)) {
+      return res.status(400).json({ message: "chalet_id is required" });
+    }
+
+    const ratingNum =
+      rating != null && String(rating).trim() !== "" ? Number(rating) : null;
+    if (ratingNum == null || Number.isNaN(ratingNum)) {
+      return res.status(400).json({ message: "rating is required" });
+    }
+    const ratingInt = Math.trunc(ratingNum);
+    if (ratingInt < 1 || ratingInt > 5) {
+      return res.status(400).json({ message: "rating must be between 1 and 5" });
+    }
+
+    const reviewText =
+      review != null && String(review).trim() !== "" ? String(review).trim() : null;
+
+    // Ensure chalet exists (helps prevent orphan rows)
+    const chalet = await Chalet.findByPk(chaletId, { attributes: ["id"] });
+    if (!chalet) {
+      return res.status(404).json({ message: "Chalet not found" });
+    }
+
+    // One review per (customer_id, chalet_id): update if exists, else create.
+    const existing = await ChaletReview.findOne({
+      where: { chalet_id: chaletId, customer_id }
+    });
+
+    let row;
+    if (existing) {
+      row = await existing.update({
+        rating: ratingInt,
+        review: reviewText
+      });
+    } else {
+      row = await ChaletReview.create({
+        chalet_id: chaletId,
+        customer_id,
+        rating: ratingInt,
+        review: reviewText
+      });
+    }
+
+    const data = row.get ? row.get({ plain: true }) : row;
+    return res.status(existing ? 200 : 201).json({
+      message: existing ? "Review updated successfully" : "Review submitted successfully",
+      table_name: ChaletReview.tableName || "globalgo_chalet_review",
+      data
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to submit review",
+      error: error.message
+    });
+  }
+});
+
+// GET /chalets/:chaletId/reviews
+// Response: all reviews for the chalet + average_rating (0..5)
+router.get("/:chaletId/reviews", async (req, res) => {
+  try {
+    const chaletId = Number(req.params.chaletId);
+    if (Number.isNaN(chaletId)) {
+      return res.status(400).json({ message: "Invalid chaletId" });
+    }
+
+    const chalet = await Chalet.findByPk(chaletId, { attributes: ["id"] });
+    if (!chalet) {
+      return res.status(404).json({ message: "Chalet not found" });
+    }
+
+    const rows = await ChaletReview.findAll({
+      where: { chalet_id: chaletId },
+      order: [["created_at", "DESC"]]
+    });
+
+    const data = rows.map((r) => (r.get ? r.get({ plain: true }) : r));
+    const ratings = data
+      .map((r) => Number(r.rating))
+      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 5);
+
+    const total = ratings.length;
+    const avg =
+      total === 0 ? 0 : ratings.reduce((sum, n) => sum + n, 0) / total;
+
+    // Keep within 0..5 and provide one-decimal average.
+    const average_rating = Math.max(0, Math.min(5, Number(avg.toFixed(1))));
+
+    return res.status(200).json({
+      message: "Chalet reviews fetched successfully",
+      chalet_id: chaletId,
+      total_reviews: total,
+      average_rating,
+      data
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to get chalet reviews",
       error: error.message
     });
   }
@@ -833,6 +966,33 @@ router.get("/by-category/:categoryId", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to get chalets by category",
+      error: error.message
+    });
+  }
+});
+
+// GET /chalets/sub-categories/:categoryId — active chalet sub-categories by category_id
+router.get("/sub-categories/:categoryId", async (req, res) => {
+  try {
+    const categoryId = parseInt(req.params.categoryId, 10);
+    if (isNaN(categoryId)) {
+      return res.status(400).json({ message: "Invalid categoryId" });
+    }
+
+    const rows = await ChaletSubCategory.findAll({
+      where: { category_id: categoryId, status: 1 },
+      order: [["id", "ASC"]],
+      raw: true
+    });
+
+    res.status(200).json({
+      message: "Chalet sub-categories fetched successfully",
+      category_id: categoryId,
+      data: rows
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get chalet sub-categories",
       error: error.message
     });
   }

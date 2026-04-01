@@ -26,6 +26,7 @@ const GlobalgoInternationalShipment = require("./GlobalgoInternationalShipment")
 const GlobalgoCarShipment = require("./GlobalgoCarShipment");
 const Chalet = require("./Chalet");
 const ChaletBooking = require("./ChaletBooking");
+const ChaletReview = require("./ChaletReview");
 const CateringOrder = require("./CateringOrder");
 const Caterer = require("./Caterer");
 const CatererMenuItem = require("./CatererMenuItem");
@@ -48,6 +49,7 @@ const ChaletAddonRestaurant = require("./ChaletAddonRestaurant");
 const ChaletAddonRestaurantCategory = require("./ChaletAddonRestaurantCategory");
 const ChaletAddMenu = require("./ChaletAddMenu");
 const ChaletCategory = require("./ChaletCategory");
+const ChaletSubCategory = require("./ChaletSubCategory");
 const BoatProductCategory = require("./BoatProductCategory");
 const BoatBookingAddon = require("./BoatBookingAddon");
 const BoatDestination = require("./BoatDestination");
@@ -89,6 +91,7 @@ module.exports = {
   GlobalgoCarShipment,
   Chalet,
   ChaletBooking,
+  ChaletReview,
   CateringOrder,
   Caterer,
   CatererMenuItem,
@@ -114,6 +117,7 @@ module.exports = {
   ChaletAddonRestaurantCategory,
   ChaletAddMenu,
   ChaletCategory,
+  ChaletSubCategory,
   BluewavePolicy,
   BYEFeedback,
   AboutUs,
